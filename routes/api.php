@@ -2,11 +2,16 @@
 
 use App\Http\Controllers\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
+use App\Http\Controllers\Admin\MailSettingsController;
 use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\VehicleCategoryController as AdminVehicleCategoryController;
+use App\Http\Controllers\Admin\VehicleController as AdminVehicleController;
 use App\Http\Controllers\Public\BookingController;
+use App\Http\Controllers\Public\PublicConfigController;
 use App\Http\Controllers\Public\QuoteController;
+use App\Http\Controllers\Public\VehicleController as PublicVehicleController;
 use App\Http\Controllers\Webhooks\StripeWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -14,6 +19,13 @@ use Illuminate\Support\Facades\Route;
  | Public (customers, no accounts)
  * -------------------------------------------------------------------- */
 Route::prefix('public')->group(function (): void {
+    // This endpoint is deliberately limited to configuration safe for a public browser.
+    Route::get('config', PublicConfigController::class);
+
+    Route::get('vehicles', [PublicVehicleController::class, 'index']);
+    Route::get('vehicles/{slug}', [PublicVehicleController::class, 'show'])
+        ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*');
+
     Route::post('quotes', [QuoteController::class, 'store'])
         ->middleware('throttle:quotes');
 
@@ -62,6 +74,18 @@ Route::prefix('admin')->group(function (): void {
         Route::get('me', [AdminAuthController::class, 'me']);
         Route::post('auth/logout', [AdminAuthController::class, 'logout']);
 
+        Route::get('integrations/mail', [MailSettingsController::class, 'show'])
+            ->middleware('can:integrations.view');
+        Route::put('integrations/mail', [MailSettingsController::class, 'update'])
+            ->middleware('can:integrations.manage');
+        Route::post('integrations/mail/test', [MailSettingsController::class, 'test'])
+            ->middleware(['can:integrations.manage', 'throttle:5,60']);
+
+        Route::get('company/sender', [MailSettingsController::class, 'showSender'])
+            ->middleware('can:company.manage');
+        Route::put('company/sender', [MailSettingsController::class, 'updateSender'])
+            ->middleware('can:company.manage');
+
         Route::middleware('can:users.manage')->group(function (): void {
             Route::get('roles', [RoleController::class, 'index']);
             Route::get('users', [UserController::class, 'index']);
@@ -71,6 +95,22 @@ Route::prefix('admin')->group(function (): void {
             Route::put('users/{user}/roles', [UserController::class, 'syncRoles']);
             Route::post('users/{user}/deactivate', [UserController::class, 'deactivate']);
             Route::post('users/{user}/activate', [UserController::class, 'activate']);
+        });
+
+        Route::middleware('can:fleet.manage')->group(function (): void {
+            Route::get('vehicle-categories', [AdminVehicleCategoryController::class, 'index']);
+            Route::post('vehicle-categories', [AdminVehicleCategoryController::class, 'store']);
+            Route::patch('vehicle-categories/{category}', [AdminVehicleCategoryController::class, 'update']);
+            Route::delete('vehicle-categories/{category}', [AdminVehicleCategoryController::class, 'destroy']);
+            Route::get('vehicles', [AdminVehicleController::class, 'index']);
+            Route::post('vehicles', [AdminVehicleController::class, 'store']);
+            Route::put('vehicles/reorder', [AdminVehicleController::class, 'reorder']);
+            Route::get('vehicles/{vehicle}', [AdminVehicleController::class, 'show']);
+            Route::patch('vehicles/{vehicle}', [AdminVehicleController::class, 'update']);
+            Route::delete('vehicles/{vehicle}', [AdminVehicleController::class, 'destroy']);
+            Route::post('vehicles/{vehicle}/images', [AdminVehicleController::class, 'storeImages']);
+            Route::put('vehicles/{vehicle}/images/order', [AdminVehicleController::class, 'orderImages']);
+            Route::delete('vehicles/{vehicle}/images/{mediaId}', [AdminVehicleController::class, 'destroyImage']);
         });
 
         // Booking and payment routes (from the booking core). Each one is guarded by its permission.

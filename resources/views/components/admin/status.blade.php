@@ -1,0 +1,3 @@
+@props(['value'])
+@php($classes = match($value) { 'confirmed', 'paid', 'completed', 'assigned', 'active' => 'bg-emerald-50 text-emerald-700 ring-emerald-600/20', 'pending_payment', 'pending_verification', 'pending' => 'bg-amber-50 text-amber-700 ring-amber-600/20', 'needs_review', 'failed', 'expired', 'cancelled', 'inactive' => 'bg-rose-50 text-rose-700 ring-rose-600/20', default => 'bg-slate-100 text-slate-600 ring-slate-500/20' })
+<span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset {{ $classes }}">{{ str($value)->replace('_', ' ')->title() }}</span>

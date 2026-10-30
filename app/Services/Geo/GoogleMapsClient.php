@@ -6,7 +6,6 @@ use App\Data\PlaceData;
 use App\Data\RouteMetrics;
 use App\Services\Settings\SettingsService;
 use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -14,13 +13,20 @@ use RuntimeException;
 final class GoogleMapsClient
 {
     private const PLACES_URL = 'https://places.googleapis.com/v1/places/';
+
+    private const PLACES_AUTOCOMPLETE_URL = 'https://places.googleapis.com/v1/places:autocomplete';
+
     private const ROUTES_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
 
     public function __construct(private readonly SettingsService $settings) {}
 
-    public function placeDetails(string $placeId): PlaceData
+    /**
+     * Place Details content is deliberately never put in a shared cache or database. Place IDs
+     * can be retained, but other Places content has stricter Google storage restrictions.
+     */
+    public function placeDetails(string $placeId, ?string $sessionToken = null): PlaceData
     {
-        return Cache::remember('place:'.$placeId, now()->addDay(), fn () => $this->fetchPlace($placeId));
+        return $this->fetchPlace($placeId, $sessionToken);
     }
 
     public function computeRoute(string $originPlaceId, string $destinationPlaceId): RouteMetrics
@@ -47,11 +53,68 @@ final class GoogleMapsClient
         );
     }
 
-    private function fetchPlace(string $placeId): PlaceData
+    /**
+     * @return list<array{place_id: string, name: string}>
+     */
+    public function countryPredictions(string $input): array
+    {
+        $predictions = $this->http()
+            ->withHeaders(['X-Goog-FieldMask' => 'suggestions.placePrediction.placeId,suggestions.placePrediction.text.text'])
+            ->post(self::PLACES_AUTOCOMPLETE_URL, [
+                'input' => $input,
+                'includedPrimaryTypes' => ['country'],
+            ])
+            ->throw()
+            ->json('suggestions', []);
+
+        return collect($predictions)
+            ->map(fn (array $suggestion): ?array => $suggestion['placePrediction'] ?? null)
+            ->filter(fn (?array $prediction): bool => isset($prediction['placeId'], $prediction['text']['text']))
+            ->map(fn (array $prediction): array => [
+                'place_id' => (string) $prediction['placeId'],
+                'name' => (string) $prediction['text']['text'],
+            ])
+            ->values()
+            ->all();
+    }
+
+    /** @return array{code: string, name: string}|null */
+    public function countryForPlace(string $placeId): ?array
+    {
+        $place = $this->http()
+            ->withHeaders(['X-Goog-FieldMask' => 'addressComponents,types'])
+            ->get(self::PLACES_URL.rawurlencode($placeId))
+            ->throw()
+            ->json();
+
+        if (! is_array($place) || ! in_array('country', $place['types'] ?? [], true)) {
+            return null;
+        }
+
+        $components = $place['addressComponents'] ?? [];
+
+        $country = collect($components)->first(
+            fn (array $component): bool => in_array('country', $component['types'] ?? [], true),
+        );
+
+        $code = strtoupper((string) ($country['shortText'] ?? ''));
+        $name = trim((string) ($country['longText'] ?? ''));
+
+        if (! preg_match('/^[A-Z]{2}$/', $code) || $name === '') {
+            return null;
+        }
+
+        return ['code' => $code, 'name' => $name];
+    }
+
+    private function fetchPlace(string $placeId, ?string $sessionToken): PlaceData
     {
         $response = $this->http()
-            ->withHeaders(['X-Goog-FieldMask' => 'id,formattedAddress,location,addressComponents'])
-            ->get(self::PLACES_URL.rawurlencode($placeId))
+            // Request only what validation needs; never request a display address from Google.
+            ->withHeaders(['X-Goog-FieldMask' => 'id,location,addressComponents'])
+            ->get(self::PLACES_URL.rawurlencode($placeId), array_filter([
+                'sessionToken' => $sessionToken,
+            ]))
             ->throw()
             ->json();
 
@@ -70,7 +133,6 @@ final class GoogleMapsClient
 
         return new PlaceData(
             placeId: (string) ($response['id'] ?? $placeId),
-            formattedAddress: (string) ($response['formattedAddress'] ?? ''),
             countryCode: $country['shortText'] ?? null,
             locality: $locality['longText'] ?? null,
             adminAreaCode: $adminArea['shortText'] ?? null,

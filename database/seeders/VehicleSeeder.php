@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\FleetUnit;
 use App\Models\Vehicle;
+use App\Models\VehicleCategory;
 use Illuminate\Database\Seeder;
 
 /**
@@ -31,9 +32,12 @@ final class VehicleSeeder extends Seeder
             $units = $data['units'];
             unset($data['units']);
 
+            $category = VehicleCategory::query()->where('slug', $data['category'] === 'first_class' ? 'first-class' : $data['category'])->firstOrFail();
+            unset($data['category']);
+
             $vehicle = Vehicle::query()->updateOrCreate(
                 ['slug' => $data['slug']],
-                $data + ['slot_check_enabled' => true, 'is_active' => true],
+                $data + ['category_id' => $category->id, 'slot_check_enabled' => true, 'is_active' => true],
             );
 
             foreach ($units as $plate) {

@@ -19,7 +19,7 @@ class Booking extends Model
     use LogsActivity, SoftDeletes;
 
     protected $fillable = [
-        'reference', 'status', 'source', 'payment_method', 'vehicle_id', 'fleet_unit_id',
+        'reference', 'quote_token_hash', 'status', 'source', 'payment_method', 'vehicle_id', 'fleet_unit_id',
         'customer_name', 'customer_email', 'customer_phone', 'passengers', 'luggage', 'flight_number',
         'currency', 'taxable_amount', 'vat_rate_bp', 'vat_amount', 'total_amount', 'vat_included',
         'vat_registration_number', 'price_breakdown', 'access_token_hash', 'verification_token_hash',
@@ -73,6 +73,11 @@ class Booking extends Model
     public function adjustments(): HasMany
     {
         return $this->hasMany(BookingAdjustment::class);
+    }
+
+    public function paymentAttempts(): HasMany
+    {
+        return $this->hasMany(PaymentAttempt::class);
     }
 
     public function transitionTo(BookingStatus $next): void

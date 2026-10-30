@@ -1,0 +1,94 @@
+/*
+ * Available when Vite assets have not been built yet. Production builds use
+ * resources/css/app.css; this keeps the server-rendered admin usable locally.
+ */
+:root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #f6f7fb; color: #0f172a; }
+a { color: inherit; text-decoration: none; }
+button, input, select, textarea { font: inherit; }
+button, summary { cursor: pointer; }
+
+.admin-login-page { display: grid; min-height: 100vh; place-items: center; padding: 1.25rem; background: radial-gradient(circle at top right, #34435a, #0f172a 52%, #020617); }
+.admin-login-card { width: 100%; max-width: 28rem; padding: 2rem; border: 1px solid rgb(255 255 255 / .1); border-radius: 1.5rem; background: #fff; box-shadow: 0 25px 50px rgb(0 0 0 / .3); }
+.admin-login-card h1 { margin: .5rem 0 0; font-size: 1.875rem; letter-spacing: -.04em; }
+.admin-login-card p { line-height: 1.5; }
+
+.admin-shell { min-height: 100vh; }
+.admin-sidebar { display: none; min-height: 100vh; padding: 1.5rem 1rem; background: #020617; color: #cbd5e1; flex-direction: column; }
+.admin-sidebar nav { display: block; }
+.admin-sidebar nav a { display: flex; align-items: center; gap: .75rem; margin: .125rem 0; padding: .65rem .75rem; border-radius: .5rem; color: #94a3b8; font-size: .875rem; font-weight: 600; }
+.admin-sidebar nav a:hover, .admin-sidebar nav a.bg-white\/10 { background: rgb(255 255 255 / .1); color: #fff; }
+.admin-main { min-width: 0; }
+.admin-header { position: sticky; top: 0; z-index: 10; display: flex; height: 4.5rem; align-items: center; justify-content: space-between; gap: 1rem; padding: 0 1.25rem; border-bottom: 1px solid #e2e8f0; background: rgb(246 247 251 / .94); backdrop-filter: blur(12px); }
+.admin-content { max-width: 80rem; margin: auto; padding: 1.75rem 1.25rem; }
+
+.admin-card { border: 1px solid #e2e8f0; border-radius: 1rem; background: #fff; box-shadow: 0 8px 30px rgb(15 23 42 / .04); }
+.admin-input { display: block; width: 100%; margin-top: .375rem; padding: .625rem .875rem; border: 1px solid #cbd5e1; border-radius: .75rem; outline: none; background: #fff; color: #0f172a; box-shadow: 0 1px 2px rgb(15 23 42 / .04); }
+.admin-input:focus { border-color: #0f172a; box-shadow: 0 0 0 3px rgb(15 23 42 / .12); }
+.admin-label { display: block; color: #64748b; font-size: .6875rem; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
+.admin-button, .admin-button-soft { display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: .75rem; padding: .65rem 1rem; font-size: .875rem; font-weight: 700; transition: .18s ease; }
+.admin-button { background: #020617; color: #fff; box-shadow: 0 1px 2px rgb(15 23 42 / .15); }
+.admin-button:hover { background: #1e293b; }
+.admin-button-soft { background: #e2e8f0; color: #334155; }
+.admin-button-soft:hover { background: #cbd5e1; }
+.admin-table { width: 100%; min-width: 42rem; border-collapse: collapse; text-align: left; font-size: .875rem; }
+.admin-table th { padding: .75rem 1.25rem; color: #94a3b8; font-size: .625rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.admin-table td { padding: 1rem 1.25rem; color: #475569; border-top: 1px solid #f1f5f9; vertical-align: middle; }
+.admin-table tbody tr:hover { background: #f8fafc; }
+
+/* A compact, intentionally scoped subset of the utility layout used by admin views. */
+.flex { display: flex; } .grid { display: grid; } .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .block { display: block; } .hidden { display: none; }
+.items-center { align-items: center; } .items-start { align-items: flex-start; } .justify-between { justify-content: space-between; } .justify-end { justify-content: flex-end; } .justify-center { justify-content: center; }
+.flex-col { flex-direction: column; } .flex-wrap { flex-wrap: wrap; } .min-w-0 { min-width: 0; } .w-full { width: 100%; } .h-fit { height: fit-content; } .overflow-hidden { overflow: hidden; } .overflow-x-auto { overflow-x: auto; } .relative { position: relative; } .absolute { position: absolute; } .right-0 { right: 0; } .left-0 { left: 0; } .z-10 { z-index: 10; } .z-20 { z-index: 20; }
+.gap-1 { gap: .25rem; } .gap-2 { gap: .5rem; } .gap-3 { gap: .75rem; } .gap-4 { gap: 1rem; } .gap-5 { gap: 1.25rem; } .gap-6 { gap: 1.5rem; } .gap-7 { gap: 1.75rem; }
+.space-y-2 > * + * { margin-top: .5rem; } .space-y-3 > * + * { margin-top: .75rem; } .space-y-4 > * + * { margin-top: 1rem; } .space-y-5 > * + * { margin-top: 1.25rem; } .space-y-6 > * + * { margin-top: 1.5rem; }
+.mt-1 { margin-top: .25rem; } .mt-2 { margin-top: .5rem; } .mt-3 { margin-top: .75rem; } .mt-4 { margin-top: 1rem; } .mt-5 { margin-top: 1.25rem; } .mt-6 { margin-top: 1.5rem; } .mt-7 { margin-top: 1.75rem; } .mt-8 { margin-top: 2rem; } .mb-4 { margin-bottom: 1rem; } .mb-5 { margin-bottom: 1.25rem; } .mb-6 { margin-bottom: 1.5rem; } .mb-7 { margin-bottom: 1.75rem; } .mb-8 { margin-bottom: 2rem; }
+.p-4 { padding: 1rem; } .p-5 { padding: 1.25rem; } .p-6 { padding: 1.5rem; } .p-8 { padding: 2rem; } .px-3 { padding-inline: .75rem; } .px-4 { padding-inline: 1rem; } .px-5 { padding-inline: 1.25rem; } .py-2 { padding-block: .5rem; } .py-3 { padding-block: .75rem; } .py-4 { padding-block: 1rem; }
+.text-xs { font-size: .75rem; } .text-sm { font-size: .875rem; } .text-base { font-size: 1rem; } .text-lg { font-size: 1.125rem; } .text-xl { font-size: 1.25rem; } .text-2xl { font-size: 1.5rem; } .text-3xl { font-size: 1.875rem; }
+.font-medium { font-weight: 500; } .font-semibold { font-weight: 600; } .font-bold { font-weight: 700; } .font-black { font-weight: 900; } .text-left { text-align: left; } .text-right { text-align: right; } .text-center { text-align: center; } .leading-5 { line-height: 1.25rem; } .leading-6 { line-height: 1.5rem; } .leading-7 { line-height: 1.75rem; }
+.text-slate-900 { color: #0f172a; } .text-slate-800 { color: #1e293b; } .text-slate-700 { color: #334155; } .text-slate-600 { color: #475569; } .text-slate-500 { color: #64748b; } .text-slate-400 { color: #94a3b8; } .text-white { color: #fff; } .text-emerald-700 { color: #047857; } .text-rose-600, .text-rose-700 { color: #be123c; } .text-amber-700 { color: #b45309; }
+.bg-white { background: #fff; } .bg-slate-50 { background: #f8fafc; } .bg-slate-100 { background: #f1f5f9; } .bg-slate-950 { background: #020617; } .bg-amber-400 { background: #fbbf24; } .rounded-xl { border-radius: .75rem; } .rounded-2xl { border-radius: 1rem; } .rounded-3xl { border-radius: 1.5rem; } .rounded-full { border-radius: 9999px; } .border { border: 1px solid #e2e8f0; } .border-t { border-top: 1px solid #e2e8f0; } .border-b { border-bottom: 1px solid #e2e8f0; }
+.group:hover .group-hover\:text-slate-800 { color: #1e293b; } .transition { transition: .18s ease; } .shadow-sm { box-shadow: 0 1px 3px rgb(15 23 42 / .1); } .shadow-xl { box-shadow: 0 20px 25px rgb(15 23 42 / .16); }
+
+/* Vehicle module. These are explicit because fallback mode deliberately does not ship every Tailwind utility. */
+.vehicle-page-heading { align-items: flex-end; }
+.vehicle-toolbar { display: flex; align-items: center; justify-content: space-between; }
+.vehicle-search { width: min(100%, 52rem); }
+.vehicle-search input { min-width: 15rem; }
+.vehicle-reorder { display: flex; align-items: center; justify-content: space-between; }
+.vehicle-list-header { display: none; }
+.vehicle-index #vehicle-list > article { transition: background-color .18s ease; }
+.vehicle-index #vehicle-list > article:hover { background: #fbfcff; }
+.vehicle-editor [data-vehicle-wizard] { overflow-x: auto; padding-bottom: .25rem; }
+.vehicle-editor [data-vehicle-wizard] button { white-space: nowrap; }
+.vehicle-editor [data-vehicle-panel] { min-height: 31rem; }
+.vehicle-editor [data-media-panel] { max-width: 72rem; }
+.vehicle-categories details summary { list-style: none; }
+.vehicle-categories details summary::-webkit-details-marker { display: none; }
+.vehicle-categories .size-14 { width: 3.5rem; height: 3.5rem; }
+
+@media (min-width: 640px) {
+    .sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sm\:flex-row { flex-direction: row; } .sm\:items-end { align-items: flex-end; } .sm\:items-center { align-items: center; } .sm\:block { display: block; }
+}
+@media (min-width: 768px) {
+    .md\:grid-cols-\[1fr_180px_auto\] { grid-template-columns: 1fr 180px auto; } .md\:grid-cols-\[1fr_180px_180px_auto\] { grid-template-columns: 1fr 180px 180px auto; } .md\:grid-cols-\[minmax\(0\,1fr\)_minmax\(260px\,420px\)\] { grid-template-columns: minmax(0, 1fr) minmax(260px, 420px); } .md\:flex-row { flex-direction: row; } .md\:items-center { align-items: center; }
+}
+@media (min-width: 1024px) {
+    .admin-shell { display: grid; grid-template-columns: 272px minmax(0, 1fr); } .admin-sidebar { display: flex; } .admin-header { padding-inline: 2.5rem; } .admin-content { padding-inline: 2.5rem; } .lg\:grid-cols-\[minmax\(0\,1fr\)_290px\] { grid-template-columns: minmax(0, 1fr) 290px; } .lg\:hidden { display: none; }
+    .vehicle-index #vehicle-list > article, .vehicle-index .vehicle-list-header { display: grid; grid-template-columns: 32px minmax(280px, 1.5fr) minmax(130px, .7fr) minmax(150px, .8fr) 130px 96px; gap: 1.25rem; align-items: center; }
+    .vehicle-index .vehicle-list-header { display: grid; }
+    .vehicle-index #vehicle-list > article > div:first-of-type { display: block; }
+    .vehicle-index #vehicle-list .size-16 { width: 4rem; height: 4rem; }
+    .vehicle-editor form[data-vehicle-form] { display: grid; grid-template-columns: minmax(0, 1fr) 290px; align-items: start; }
+    .vehicle-editor form[data-vehicle-form] > aside { position: sticky; top: 6rem; }
+    .vehicle-categories > .grid { grid-template-columns: minmax(0, 1fr) 22.5rem; }
+}
+@media (max-width: 1023px) {
+    .vehicle-toolbar, .vehicle-reorder { align-items: stretch; }
+    .vehicle-search { width: 100%; }
+    .vehicle-index #vehicle-list > article { display: grid; grid-template-columns: minmax(0, 1fr); }
+}
+@media (min-width: 1280px) {
+    .xl\:grid-cols-\[1\.5fr_1fr\] { grid-template-columns: 1.5fr 1fr; } .xl\:grid-cols-\[1\.55fr_1fr\] { grid-template-columns: 1.55fr 1fr; } .xl\:grid-cols-\[minmax\(0\,1fr\)_380px\] { grid-template-columns: minmax(0, 1fr) 380px; } .xl\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .xl\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .xl\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

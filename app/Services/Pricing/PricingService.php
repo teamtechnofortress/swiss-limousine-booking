@@ -9,19 +9,25 @@ use App\Models\Vehicle;
 /** Pure pricing: no database and no settings. Inputs in, breakdown out. */
 final class PricingService
 {
-    public function price(Vehicle $vehicle, RouteMetrics $route, bool $roundTrip, int $discountPercent): PriceBreakdown
-    {
-        $oneWay = $this->legAmount($vehicle, $route);
+    public function price(
+        Vehicle $vehicle,
+        RouteMetrics $outboundRoute,
+        bool $roundTrip,
+        int $discountPercent,
+        ?RouteMetrics $returnRoute = null,
+    ): PriceBreakdown {
+        $outbound = $this->legAmount($vehicle, $outboundRoute);
 
         if (! $roundTrip) {
-            return new PriceBreakdown(['outbound' => $oneWay], 0, $oneWay);
+            return new PriceBreakdown(['outbound' => $outbound], 0, $outbound);
         }
 
-        $gross = $oneWay * 2;
+        $return = $this->legAmount($vehicle, $returnRoute ?? $outboundRoute);
+        $gross = $outbound + $return;
         $discount = $discountPercent > 0 ? (int) round($gross * $discountPercent / 100) : 0;
 
         return new PriceBreakdown(
-            legs: ['outbound' => $oneWay, 'return' => $oneWay],
+            legs: ['outbound' => $outbound, 'return' => $return],
             discount: $discount,
             subtotal: $gross - $discount,
         );

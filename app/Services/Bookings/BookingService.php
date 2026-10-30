@@ -7,12 +7,15 @@ use App\Data\CreateBookingData;
 use App\Data\CreatedBooking;
 use App\Enums\BlockType;
 use App\Enums\BookingStatus;
+use App\Enums\PaymentAttemptStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Events\BookingConfirmed;
 use App\Exceptions\BookingException;
 use App\Models\Booking;
 use App\Models\BookingLeg;
+use App\Models\Payment;
+use App\Models\PaymentAttempt;
 use App\Models\Vehicle;
 use App\Repositories\Contracts\BookingRepositoryInterface;
 use App\Repositories\Contracts\VehicleRepositoryInterface;
@@ -21,6 +24,7 @@ use App\Services\Payments\PaymentService;
 use App\Services\Quotes\QuoteStore;
 use App\Services\Settings\SettingsService;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -39,12 +43,31 @@ final class BookingService
     ) {}
 
     /**
-     * Consumes the quote, takes the slot and saves the booking in one transaction.
-     * The browser sends only the token and the chosen vehicle. Price and VAT come from the server snapshot.
+     * Reads the quote without deleting it, then uses MySQL's unique quote-token hash as the
+     * idempotency boundary. A failed transaction leaves the quote retryable until its Redis TTL.
      */
     public function create(CreateBookingData $data): CreatedBooking
     {
-        $snapshot = $this->quotes->consume($data->quoteToken) ?? throw BookingException::quoteUnavailable();
+        $quoteTokenHash = hash('sha256', $data->quoteToken);
+
+        $existing = Booking::query()->where('quote_token_hash', $quoteTokenHash)->first();
+
+        if ($existing !== null) {
+            return new CreatedBooking($existing->load(['legs', 'payment', 'vehicle']), null, null, false);
+        }
+
+        $snapshot = $this->quotes->find($data->quoteToken);
+
+        if ($snapshot === null) {
+            // A concurrent request may have committed just as this quote expired from Redis.
+            $existing = Booking::query()->where('quote_token_hash', $quoteTokenHash)->first();
+
+            if ($existing !== null) {
+                return new CreatedBooking($existing->load(['legs', 'payment', 'vehicle']), null, null, false);
+            }
+
+            throw BookingException::quoteUnavailable();
+        }
         $offer = $snapshot->offerFor($data->vehicleId);
         $total = (int) $offer['vat']['gross'];
 
@@ -54,85 +77,109 @@ final class BookingService
         [$status, $blockType, $holdUntil, $verificationToken] = $this->initialState($data->paymentMethod, $now);
         $accessToken = Str::random(64);
 
-        $booking = DB::transaction(function () use (
-            $data, $snapshot, $offer, $total, $status, $blockType, $holdUntil, $verificationToken, $accessToken,
-        ): Booking {
-            $vehicle = $this->vehicles->lockVehicle($data->vehicleId);
-            $windows = $this->legWindows($snapshot->legs);
-            $this->availability->assertWindowsFree($vehicle, $windows);
+        try {
+            [$booking, $wasCreated] = DB::transaction(function () use (
+                $data, $snapshot, $offer, $total, $status, $blockType, $holdUntil, $verificationToken, $accessToken, $quoteTokenHash,
+            ): array {
+                $existing = Booking::query()->where('quote_token_hash', $quoteTokenHash)->lockForUpdate()->first();
 
-            $booking = $this->bookings->create([
-                'reference' => $this->newReference(),
-                'status' => $status,
-                'source' => 'website',
-                'payment_method' => $data->paymentMethod,
-                'vehicle_id' => $vehicle->id,
-                'customer_name' => $data->customerName,
-                'customer_email' => $data->customerEmail,
-                'customer_phone' => $data->customerPhone,
-                'passengers' => $snapshot->passengers,
-                'luggage' => $snapshot->luggage,
-                'flight_number' => $data->flightNumber,
-                'currency' => $snapshot->currency,
-                'taxable_amount' => $offer['vat']['net'],
-                'vat_rate_bp' => $offer['vat']['rate_bp'],
-                'vat_amount' => $offer['vat']['vat'],
-                'total_amount' => $total,
-                'vat_included' => $offer['vat']['included'],
-                'vat_registration_number' => $this->settings->string('vat_registration_number') ?: null,
-                'price_breakdown' => $offer['price'],
-                'access_token_hash' => hash('sha256', $accessToken),
-                'verification_token_hash' => $verificationToken !== null ? hash('sha256', $verificationToken) : null,
-                'hold_expires_at' => $holdUntil,
-            ]);
+                if ($existing !== null) {
+                    return [$existing->load(['legs', 'payment', 'vehicle']), false];
+                }
 
-            foreach ($snapshot->legs as $index => $leg) {
-                $bookingLeg = $booking->legs()->create([
-                    'direction' => $leg['direction'],
-                    'pickup' => $leg['pickup'],
-                    'dropoff' => $leg['dropoff'],
-                    'starts_at' => CarbonImmutable::parse($leg['starts_at']),
-                    'distance_m' => $leg['distance_m'],
-                    'duration_s' => $leg['duration_s'],
-                    'amount' => $offer['price']['legs'][$leg['direction']],
+                $vehicle = $this->vehicles->lockVehicle($data->vehicleId);
+                $windows = $this->legWindows($snapshot->legs);
+                $this->availability->assertWindowsFree($vehicle, $windows);
+
+                $booking = $this->bookings->create([
+                    'reference' => $this->newReference(),
+                    'quote_token_hash' => $quoteTokenHash,
+                    'status' => $status,
+                    'source' => 'website',
+                    'payment_method' => $data->paymentMethod,
+                    'vehicle_id' => $vehicle->id,
+                    'customer_name' => $data->customerName,
+                    'customer_email' => $data->customerEmail,
+                    'customer_phone' => $data->customerPhone,
+                    'passengers' => $snapshot->passengers,
+                    'luggage' => $snapshot->luggage,
+                    'flight_number' => $data->flightNumber,
+                    'currency' => $snapshot->currency,
+                    'taxable_amount' => $offer['vat']['net'],
+                    'vat_rate_bp' => $offer['vat']['rate_bp'],
+                    'vat_amount' => $offer['vat']['vat'],
+                    'total_amount' => $total,
+                    'vat_included' => $offer['vat']['included'],
+                    'vat_registration_number' => $this->settings->string('vat_registration_number') ?: null,
+                    'price_breakdown' => $offer['price'],
+                    'access_token_hash' => hash('sha256', $accessToken),
+                    'verification_token_hash' => $verificationToken !== null ? hash('sha256', $verificationToken) : null,
+                    'hold_expires_at' => $holdUntil,
                 ]);
 
-                // Slot-check-off vehicles never get blocks.
-                if ($vehicle->slot_check_enabled) {
-                    $this->availability->writeBlock(
-                        $vehicle->id,
-                        $booking->id,
-                        $bookingLeg->id,
-                        $blockType,
-                        $windows[$index]['from'],
-                        $windows[$index]['to'],
-                        $holdUntil,
-                    );
+                foreach ($snapshot->legs as $index => $leg) {
+                    $bookingLeg = $booking->legs()->create([
+                        'direction' => $leg['direction'],
+                        'pickup' => $leg['pickup'],
+                        'dropoff' => $leg['dropoff'],
+                        'starts_at' => CarbonImmutable::parse($leg['starts_at']),
+                        'distance_m' => $leg['distance_m'],
+                        'duration_s' => $leg['duration_s'],
+                        'amount' => $offer['price']['legs'][$leg['direction']],
+                    ]);
+
+                    // Slot-check-off vehicles never get blocks.
+                    if ($vehicle->slot_check_enabled) {
+                        $this->availability->writeBlock(
+                            $vehicle->id,
+                            $booking->id,
+                            $bookingLeg->id,
+                            $blockType,
+                            $windows[$index]['from'],
+                            $windows[$index]['to'],
+                            $holdUntil,
+                        );
+                    }
                 }
+
+                $booking->payment()->create([
+                    'method' => $data->paymentMethod,
+                    'provider' => null,
+                    'gross_amount' => $total,
+                    'vat_amount' => $offer['vat']['vat'],
+                    'currency' => $snapshot->currency,
+                    'status' => PaymentStatus::Unpaid,
+                ]);
+
+                return [$booking->load(['legs', 'payment', 'vehicle']), true];
+            });
+        } catch (UniqueConstraintViolationException $e) {
+            // A simultaneous request won the unique quote-token race. Return its booking safely.
+            $booking = Booking::query()->where('quote_token_hash', $quoteTokenHash)->first();
+
+            if ($booking === null) {
+                throw $e;
             }
 
-            $booking->payment()->create([
-                'method' => $data->paymentMethod,
-                'provider' => null,
-                'gross_amount' => $total,
-                'vat_amount' => $offer['vat']['vat'],
-                'currency' => $snapshot->currency,
-                'status' => PaymentStatus::Unpaid,
-            ]);
+            $booking->load(['legs', 'payment', 'vehicle']);
+            $wasCreated = false;
+        }
 
-            return $booking->load(['legs', 'payment', 'vehicle']);
-        });
-
-        return new CreatedBooking($booking, $accessToken, $verificationToken);
+        return new CreatedBooking(
+            $booking,
+            $wasCreated ? $accessToken : null,
+            $wasCreated ? $verificationToken : null,
+            $wasCreated,
+        );
     }
 
     /**
-     * Starts or restarts an online payment. The hold is renewed first, because a Stripe session
-     * needs more than 30 minutes and a returning customer may have less time left on the original hold.
+     * Starts a hosted payment or resumes its still-open Checkout Session. A retry never creates a
+     * second session while the current one is usable; an interrupted Stripe call reuses its key.
      */
     public function startOnlineCheckout(int $bookingId): CheckoutSession
     {
-        $booking = DB::transaction(function () use ($bookingId): Booking {
+        [$booking, $attempt] = DB::transaction(function () use ($bookingId): array {
             [, $booking] = $this->locker->lock($bookingId);
 
             if ($booking->payment_method !== PaymentMethod::Online || $booking->status !== BookingStatus::PendingPayment) {
@@ -143,14 +190,46 @@ final class BookingService
                 throw BookingException::holdExpired();
             }
 
+            $payment = Payment::query()->where('booking_id', $booking->id)->lockForUpdate()->firstOrFail();
+            $attempt = PaymentAttempt::query()
+                ->where('payment_id', $payment->id)
+                ->where('is_current', true)
+                ->lockForUpdate()
+                ->first();
+
+            if ($attempt !== null && $attempt->status->isOpen() && $attempt->expires_at?->isFuture()) {
+                return [$booking, $attempt];
+            }
+
+            if ($attempt !== null) {
+                $attempt->forceFill([
+                    'is_current' => false,
+                    'status' => PaymentAttemptStatus::Superseded,
+                ])->save();
+            }
+
             $expiresAt = CarbonImmutable::now('UTC')->addMinutes($this->settings->int('hold_ttl_minutes'));
             $booking->blocks()->update(['expires_at' => $expiresAt]);
             $booking->forceFill(['hold_expires_at' => $expiresAt])->save();
 
-            return $booking;
+            $attempt = PaymentAttempt::query()->create([
+                'payment_id' => $payment->id,
+                'booking_id' => $booking->id,
+                'provider' => 'stripe',
+                'idempotency_key' => hash('sha256', (string) Str::uuid()),
+                'status' => PaymentAttemptStatus::Creating,
+                'is_current' => true,
+                'expires_at' => $expiresAt,
+            ]);
+
+            return [$booking, $attempt];
         });
 
-        return $this->payments->createCheckout($booking, CarbonImmutable::instance($booking->hold_expires_at));
+        if ($attempt->provider_reference !== null) {
+            return $this->payments->resumeCheckout($attempt);
+        }
+
+        return $this->payments->createCheckout($booking, $attempt, CarbonImmutable::instance($attempt->expires_at));
     }
 
     /** Finds a booking by reference and access token. Both must match. */
@@ -195,19 +274,63 @@ final class BookingService
     }
 
     /** Called by the webhook handler when Stripe reports a paid checkout. Safe to call twice. */
-    public function confirmOnlinePayment(int $bookingId, string $sessionId, ?string $paymentIntent): void
+    public function confirmOnlinePayment(int $attemptId, string $sessionId, ?string $paymentIntent): void
     {
-        DB::transaction(function () use ($bookingId, $sessionId, $paymentIntent): void {
-            [$vehicle, $booking] = $this->locker->lock($bookingId);
+        $bookingId = PaymentAttempt::query()->whereKey($attemptId)->value('booking_id');
+
+        if ($bookingId === null) {
+            Log::error('Checkout completed for an unknown payment attempt', ['attempt_id' => $attemptId]);
+
+            return;
+        }
+
+        DB::transaction(function () use ($bookingId, $attemptId, $sessionId, $paymentIntent): void {
+            [$vehicle, $booking] = $this->locker->lock((int) $bookingId);
+            $payment = Payment::query()->where('booking_id', $booking->id)->lockForUpdate()->firstOrFail();
+            $attempt = PaymentAttempt::query()
+                ->whereKey($attemptId)
+                ->where('payment_id', $payment->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($attempt === null || ($attempt->provider_reference !== null && $attempt->provider_reference !== $sessionId)) {
+                Log::critical('Checkout session does not match its payment attempt', [
+                    'attempt_id' => $attemptId,
+                    'session_id' => $sessionId,
+                ]);
+
+                return;
+            }
+
+            if ($attempt->provider_reference === null) {
+                // The signed webhook may race the response that records a newly-created session.
+                $attempt->forceFill(['provider_reference' => $sessionId])->save();
+            }
+
+            if (! $attempt->is_current) {
+                $attempt->forceFill([
+                    'status' => PaymentAttemptStatus::Paid,
+                    'provider_payment_intent' => $paymentIntent,
+                    'paid_at' => CarbonImmutable::now('UTC'),
+                ])->save();
+
+                Log::critical('Payment received for a superseded Checkout Session; manual review required', [
+                    'reference' => $booking->reference,
+                    'attempt_id' => $attempt->id,
+                    'session_id' => $sessionId,
+                ]);
+
+                return;
+            }
 
             if (in_array($booking->status, [
                 BookingStatus::Confirmed, BookingStatus::Assigned, BookingStatus::InProgress, BookingStatus::Completed,
             ], true)) {
-                // Duplicate delivery. Record the payment reference only if it is missing.
+                // Duplicate delivery of the current, already-settled Checkout Session.
                 return;
             }
 
-            $this->payments->recordPaid($booking, $sessionId, $paymentIntent);
+            $this->payments->recordPaid($booking, $attempt, $paymentIntent);
 
             if (! in_array($booking->status, [BookingStatus::PendingPayment, BookingStatus::Expired], true)) {
                 // Money arrived for a cancelled or review-state booking. It is recorded; an admin decides on a refund.
@@ -224,17 +347,40 @@ final class BookingService
     }
 
     /** Stripe reported the checkout session expired. Only applies if that session is still the current one. */
-    public function expireOnlineCheckout(int $bookingId, string $sessionId): void
+    public function expireOnlineCheckout(int $attemptId, string $sessionId): void
     {
-        DB::transaction(function () use ($bookingId, $sessionId): void {
-            [, $booking] = $this->locker->lock($bookingId);
+        $bookingId = PaymentAttempt::query()->whereKey($attemptId)->value('booking_id');
 
-            if ($booking->status !== BookingStatus::PendingPayment) {
+        if ($bookingId === null) {
+            Log::warning('Checkout expired for an unknown payment attempt', ['attempt_id' => $attemptId]);
+
+            return;
+        }
+
+        DB::transaction(function () use ($bookingId, $attemptId, $sessionId): void {
+            [, $booking] = $this->locker->lock((int) $bookingId);
+            $payment = Payment::query()->where('booking_id', $booking->id)->lockForUpdate()->firstOrFail();
+            $attempt = PaymentAttempt::query()
+                ->whereKey($attemptId)
+                ->where('payment_id', $payment->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($attempt === null || ($attempt->provider_reference !== null && $attempt->provider_reference !== $sessionId)) {
                 return;
             }
 
-            if ($booking->payment?->provider_reference !== $sessionId) {
-                return; // a newer session replaced this one
+            if ($attempt->status === PaymentAttemptStatus::Paid) {
+                return; // a delayed expiry event must never overwrite a successful payment
+            }
+
+            $attempt->forceFill([
+                'provider_reference' => $sessionId,
+                'status' => PaymentAttemptStatus::Expired,
+            ])->save();
+
+            if (! $attempt->is_current || $booking->status !== BookingStatus::PendingPayment) {
+                return; // an old session can never expire or otherwise change a newer booking state
             }
 
             $this->payments->markFailed($booking);

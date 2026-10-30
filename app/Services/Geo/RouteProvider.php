@@ -3,28 +3,18 @@
 namespace App\Services\Geo;
 
 use App\Data\RouteMetrics;
-use Illuminate\Support\Facades\Cache;
 
-/** Route distance and duration, cached for 30 days. */
+/**
+ * One live, traffic-unaware route calculation per quote direction. Route results are not cached
+ * across requests because Routes content has restrictive storage rules and stale durations are
+ * unsuitable for fleet availability.
+ */
 final class RouteProvider
 {
-    private const TTL_DAYS = 30;
-
     public function __construct(private readonly GoogleMapsClient $google) {}
 
     public function metrics(string $originPlaceId, string $destinationPlaceId): RouteMetrics
     {
-        $key = "route:{$originPlaceId}:{$destinationPlaceId}";
-
-        $cached = Cache::get($key);
-
-        if (is_array($cached)) {
-            return RouteMetrics::fromArray($cached);
-        }
-
-        $metrics = $this->google->computeRoute($originPlaceId, $destinationPlaceId);
-        Cache::put($key, $metrics->toArray(), now()->addDays(self::TTL_DAYS));
-
-        return $metrics;
+        return $this->google->computeRoute($originPlaceId, $destinationPlaceId);
     }
 }

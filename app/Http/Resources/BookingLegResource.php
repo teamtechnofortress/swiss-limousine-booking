@@ -15,8 +15,6 @@ final class BookingLegResource extends JsonResource
             'pickup' => $this->pickup['address'] ?? null,
             'dropoff' => $this->dropoff['address'] ?? null,
             'starts_at' => $this->starts_at->toIso8601String(),
-            'distance_km' => round($this->distance_m / 1000, 1),
-            'duration_minutes' => (int) round($this->duration_s / 60),
             'amount' => $this->amount,
         ];
     }

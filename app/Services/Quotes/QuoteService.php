@@ -2,7 +2,6 @@
 
 namespace App\Services\Quotes;
 
-use App\Data\PlaceData;
 use App\Data\QuoteRequestData;
 use App\Data\QuoteSnapshot;
 use App\Data\RouteMetrics;
@@ -37,19 +36,25 @@ final class QuoteService
         $now = CarbonImmutable::now('UTC');
         $this->assertSchedule($request->pickupAt, $now);
 
-        $pickup = $this->maps->placeDetails($request->pickupPlaceId);
-        $dropoff = $this->maps->placeDetails($request->dropoffPlaceId);
+        $pickup = $this->maps->placeDetails($request->pickupPlaceId, $request->pickupSessionToken);
+        $dropoff = $this->maps->placeDetails($request->dropoffPlaceId, $request->dropoffSessionToken);
         $this->serviceArea->assertAllowed($pickup, $dropoff);
 
-        $route = $this->routes->metrics($pickup->placeId, $dropoff->placeId);
-        $legs = [$this->leg('outbound', $pickup, $dropoff, $request->pickupAt, $route)];
+        $outboundRoute = $this->routes->metrics($pickup->placeId, $dropoff->placeId);
+        $legs = [$this->leg(
+            'outbound', $pickup->placeId, $dropoff->placeId, $request->pickupAddress, $request->dropoffAddress,
+            $request->pickupAt, $outboundRoute,
+        )];
 
         $returnAt = $request->returnAt;
 
         if ($returnAt !== null) {
-            $this->assertReturnGap($request->pickupAt->addSeconds($route->durationS), $returnAt);
-            // Distance is symmetric, so the return leg reuses the outbound metrics.
-            $legs[] = $this->leg('return', $dropoff, $pickup, $returnAt, $route);
+            $this->assertReturnGap($request->pickupAt->addSeconds($outboundRoute->durationS), $returnAt);
+            $returnRoute = $this->routes->metrics($dropoff->placeId, $pickup->placeId);
+            $legs[] = $this->leg(
+                'return', $dropoff->placeId, $pickup->placeId, $request->dropoffAddress, $request->pickupAddress,
+                $returnAt, $returnRoute,
+            );
         }
 
         $windows = array_map(
@@ -63,18 +68,33 @@ final class QuoteService
         $discountPercent = $this->settings->int('round_trip_discount_percent');
         $offers = [];
 
-        foreach ($this->vehicles->bookableFor($request->passengers, $request->luggage) as $vehicle) {
+        $vehicles = $this->vehicles->bookableFor($request->passengers, $request->luggage, $request->vehicleSlug);
+
+        // A stale or invalid vehicle URL should still let the customer see the
+        // vehicles that can serve their trip instead of returning an empty quote.
+        if ($request->vehicleSlug !== null && $vehicles->isEmpty()) {
+            $vehicles = $this->vehicles->bookableFor($request->passengers, $request->luggage);
+        }
+
+        foreach ($vehicles as $vehicle) {
             if (! $this->availability->windowsFree($vehicle, $windows)) {
                 continue;
             }
 
-            $price = $this->pricing->price($vehicle, $route, $returnAt !== null, $discountPercent);
+            $price = $this->pricing->price(
+                $vehicle,
+                $outboundRoute,
+                $returnAt !== null,
+                $discountPercent,
+                $returnAt !== null ? $returnRoute : null,
+            );
             $split = $this->vat->split($price->subtotal);
 
             $offers[$vehicle->id] = [
                 'vehicle_id' => $vehicle->id,
                 'name' => $vehicle->name,
-                'category' => $vehicle->category->value,
+                'slug' => $vehicle->slug,
+                'category' => $vehicle->category->name,
                 'price' => $price->toArray(),
                 'vat' => $split->toArray(),
             ];
@@ -130,12 +150,20 @@ final class QuoteService
     }
 
     /** @return array<string, mixed> */
-    private function leg(string $direction, PlaceData $from, PlaceData $to, CarbonImmutable $startsAt, RouteMetrics $route): array
-    {
+    private function leg(
+        string $direction,
+        string $fromPlaceId,
+        string $toPlaceId,
+        string $pickupAddress,
+        string $dropoffAddress,
+        CarbonImmutable $startsAt,
+        RouteMetrics $route,
+    ): array {
         return [
             'direction' => $direction,
-            'pickup' => $from->toArray(),
-            'dropoff' => $to->toArray(),
+            // Only the Place ID comes from Google. Address text is customer-confirmed input.
+            'pickup' => ['place_id' => $fromPlaceId, 'address' => $pickupAddress],
+            'dropoff' => ['place_id' => $toPlaceId, 'address' => $dropoffAddress],
             'starts_at' => $startsAt->toIso8601String(),
             'distance_m' => $route->distanceM,
             'duration_s' => $route->durationS,

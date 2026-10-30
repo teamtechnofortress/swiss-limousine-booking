@@ -34,7 +34,9 @@ final class BookingController extends Controller
             }
         }
 
-        event(new BookingCreated($booking, $created->accessToken, $created->verificationToken));
+        if ($created->wasCreated) {
+            event(new BookingCreated($booking, $created->accessToken, $created->verificationToken));
+        }
 
         return (new PublicBookingResource($booking->loadMissing(['legs', 'payment', 'vehicle'])))
             ->additional(['meta' => [

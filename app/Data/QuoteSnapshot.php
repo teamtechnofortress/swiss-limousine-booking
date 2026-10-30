@@ -5,7 +5,7 @@ namespace App\Data;
 use App\Exceptions\BookingException;
 use Carbon\CarbonImmutable;
 
-/** The complete quote stored in Redis. Everything needed to create a booking is in here. */
+/** The complete quote stored in the configured cache. Everything needed to create a booking is in here. */
 final readonly class QuoteSnapshot
 {
     /**

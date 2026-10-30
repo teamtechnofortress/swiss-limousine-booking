@@ -31,7 +31,14 @@ final class SettingsSeeder extends Seeder
             'stripe_webhook_secret' => $this->def('integrations', 'secret', '', 'Signing secret that proves a webhook came from Stripe. Encrypted.', true, $integrations),
             'google_browser_key' => $this->def('integrations', 'string', '', 'Google key for Places Autocomplete in the browser. Restrict to your domains.', false, $integrations),
             'google_server_key' => $this->def('integrations', 'secret', '', 'Google key used by Laravel for Place Details and Routes. Restrict to server IPs. Encrypted.', true, $integrations),
+            'turnstile_site_key' => $this->def('integrations', 'string', '', 'Cloudflare Turnstile site key used in the customer browser. This is safe to publish.', false, $integrations),
             'turnstile_secret_key' => $this->def('integrations', 'secret', '', 'Cloudflare Turnstile secret for bot checks. Encrypted.', true, $integrations),
+            'mail_mailer' => $this->def('integrations', 'string', 'smtp', 'Email transport: smtp for production, log to write emails to the log file for local testing.', false, $integrations),
+            'smtp_host' => $this->def('integrations', 'string', '', 'SMTP server host name, for example smtp.provider.ch.', false, $integrations),
+            'smtp_port' => $this->def('integrations', 'int', '587', 'SMTP port: 587 for STARTTLS, 465 for SSL.', false, $integrations),
+            'smtp_encryption' => $this->def('integrations', 'string', 'tls', 'Connection security: tls (STARTTLS), ssl or none.', false, $integrations),
+            'smtp_username' => $this->def('integrations', 'string', '', 'SMTP login name.', false, $integrations),
+            'smtp_password' => $this->def('integrations', 'secret', '', 'SMTP password. Encrypted and never shown after saving.', true, $integrations),
 
             // Payment methods
             'payment_gateway' => $this->def('payment_methods', 'string', 'stripe', 'Active online payment provider.', false, 'payment_methods.manage'),
@@ -44,6 +51,7 @@ final class SettingsSeeder extends Seeder
             // Service area
             'service_area_enforced' => $this->def('service_area', 'bool', '1', 'When on, every trip must fall inside the allowed countries and the required location rule.', false, 'service_area.manage'),
             'allowed_countries' => $this->def('service_area', 'json', '["CH"]', 'ISO country codes where pickups and drop-offs are allowed.', false, 'service_area.manage'),
+            'allowed_country_names' => $this->def('service_area', 'json', '{"CH":"Switzerland"}', 'Country names paired with the allowed country codes for administration display.', false, 'service_area.manage'),
             'required_location_enabled' => $this->def('service_area', 'bool', '0', 'When on, every journey must touch the required location. Enable after choosing the location.', false, 'service_area.manage'),
             'required_location_id' => $this->def('service_area', 'nullable_int', '', 'The saved location a journey must include (from Locations).', false, 'service_area.manage'),
             'required_location_match_type' => $this->def('service_area', 'string', 'radius', 'How an address matches the required location: city, region or radius.', false, 'service_area.manage'),
@@ -54,7 +62,7 @@ final class SettingsSeeder extends Seeder
 
             // Availability
             'default_slot_check_enabled' => $this->def('availability', 'bool', '1', 'Starting value of the slot check for new vehicles.', false, 'fleet.manage'),
-            'hold_ttl_minutes' => $this->def('availability', 'int', '30', 'Minutes an online booking holds its car while the customer pays. Minimum 31 (Stripe needs more than 30).', false, 'fleet.manage'),
+            'hold_ttl_minutes' => $this->def('availability', 'int', '31', 'Minutes an online booking holds its car while the customer pays. Minimum 31 (Stripe needs more than 30).', false, 'fleet.manage'),
             'default_buffer_minutes' => $this->def('availability', 'int', '60', 'Minutes reserved before pickup and after drop-off for reset and delays.', false, 'fleet.manage'),
 
             // Tax and currency
@@ -88,6 +96,8 @@ final class SettingsSeeder extends Seeder
             'company_phone' => $this->def('company', 'string', '', 'Phone number shown in emails.', false, 'company.manage'),
             'company_address' => $this->def('company', 'string', '', 'Postal address shown on receipts.', false, 'company.manage'),
             'admin_notification_email' => $this->def('company', 'string', '', 'Receives admin alerts such as new bookings and reviews.', false, 'company.manage'),
+            'mail_from_address' => $this->def('company', 'string', '', 'Sender address on customer emails. Must be allowed by the SMTP provider.', false, 'company.manage'),
+            'mail_from_name' => $this->def('company', 'string', '', 'Sender name shown on customer emails.', false, 'company.manage'),
         ];
     }
 

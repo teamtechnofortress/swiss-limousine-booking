@@ -5,6 +5,7 @@ namespace App\Gateways\Payments;
 use App\Data\CheckoutSession;
 use App\Models\Booking;
 use App\Models\Payment;
+use App\Models\PaymentAttempt;
 use App\Services\Settings\SettingsService;
 use Carbon\CarbonImmutable;
 use RuntimeException;
@@ -21,7 +22,7 @@ final class StripeGateway implements PaymentGateway
         return 'stripe';
     }
 
-    public function createCheckout(Booking $booking, CarbonImmutable $expiresAt): CheckoutSession
+    public function createCheckout(Booking $booking, PaymentAttempt $attempt, CarbonImmutable $expiresAt): CheckoutSession
     {
         $session = $this->client()->checkout->sessions->create([
             'mode' => 'payment',
@@ -36,13 +37,33 @@ final class StripeGateway implements PaymentGateway
                     'product_data' => ['name' => 'Chauffeur transfer '.$booking->reference],
                 ],
             ]],
-            'metadata' => ['booking_reference' => $booking->reference],
-            'payment_intent_data' => ['metadata' => ['booking_reference' => $booking->reference]],
+            'metadata' => [
+                'booking_reference' => $booking->reference,
+                'payment_attempt_id' => (string) $attempt->id,
+            ],
+            'payment_intent_data' => ['metadata' => [
+                'booking_reference' => $booking->reference,
+                'payment_attempt_id' => (string) $attempt->id,
+            ]],
             'success_url' => $this->frontendUrl("/bookings/{$booking->reference}?payment=success"),
             'cancel_url' => $this->frontendUrl("/bookings/{$booking->reference}?payment=cancelled"),
-        ]);
+        ], ['idempotency_key' => $attempt->idempotency_key]);
 
         return new CheckoutSession((string) $session->id, (string) $session->url);
+    }
+
+    public function retrieveCheckout(PaymentAttempt $attempt): CheckoutSession
+    {
+        $reference = $attempt->provider_reference
+            ?? throw new RuntimeException('Cannot resume a Checkout Session without its provider reference.');
+
+        $session = $this->client()->checkout->sessions->retrieve($reference);
+
+        if (! is_string($session->url) || $session->url === '') {
+            throw new RuntimeException('Stripe returned no Checkout URL.');
+        }
+
+        return new CheckoutSession((string) $session->id, $session->url);
     }
 
     public function refund(Payment $payment, int $amount, string $idempotencyKey): string
@@ -59,7 +80,7 @@ final class StripeGateway implements PaymentGateway
     {
         try {
             $event = Webhook::constructEvent($payload, $signature, $this->webhookSecret());
-        } catch (SignatureVerificationException | \UnexpectedValueException $e) {
+        } catch (SignatureVerificationException|\UnexpectedValueException $e) {
             throw new RuntimeException('Invalid webhook signature.', 0, $e);
         }
 

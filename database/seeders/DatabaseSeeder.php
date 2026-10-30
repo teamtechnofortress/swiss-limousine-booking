@@ -10,6 +10,7 @@ final class DatabaseSeeder extends Seeder
     {
         $this->call([
             RbacSeeder::class,
+            AdminSeeder::class,
             SettingsSeeder::class,
             VehicleSeeder::class,
         ]);

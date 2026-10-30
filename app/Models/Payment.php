@@ -33,4 +33,9 @@ class Payment extends Model
     {
         return $this->hasMany(Refund::class);
     }
+
+    public function attempts(): HasMany
+    {
+        return $this->hasMany(PaymentAttempt::class);
+    }
 }

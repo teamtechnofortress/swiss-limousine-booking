@@ -3,11 +3,13 @@
 use App\Exceptions\BookingException;
 use App\Exceptions\RbacException;
 use App\Http\Middleware\EnsureAdminIsActive;
+use App\Http\Middleware\LogApiTraffic;
 use App\Services\Bookings\BookingService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -17,23 +19,40 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->redirectGuestsTo(fn (Request $request) => route('admin.login'));
+
+        // Writes API requests and responses only when APP_ENV is local/development.
+        $middleware->api(append: [LogApiTraffic::class]);
+
         $middleware->alias([
             'admin.active' => EnsureAdminIsActive::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->render(fn (BookingException $e) => response()->json([
-            'error' => ['code' => $e->errorCode, 'message' => $e->getMessage()],
-        ], $e->status));
+        $exceptions->render(function (BookingException $e, Request $request) {
+            if (! $request->expectsJson()) {
+                return back()->withInput()->withErrors(['booking' => $e->getMessage()]);
+            }
 
-        $exceptions->render(fn (RbacException $e) => response()->json([
-            'error' => ['code' => $e->errorCode, 'message' => $e->getMessage()],
-        ], $e->status));
+            return response()->json([
+                'error' => ['code' => $e->errorCode, 'message' => $e->getMessage()],
+            ], $e->status);
+        });
+
+        $exceptions->render(function (RbacException $e, Request $request) {
+            if (! $request->expectsJson()) {
+                return back()->withInput()->withErrors(['admin' => $e->getMessage()]);
+            }
+
+            return response()->json([
+                'error' => ['code' => $e->errorCode, 'message' => $e->getMessage()],
+            ], $e->status);
+        });
     })
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->call(fn () => app(BookingService::class)->expireStale())
             ->everyMinute()
-            ->withoutOverlapping()
-            ->name('expire-stale-bookings');
+            ->name('expire-stale-bookings')
+            ->withoutOverlapping();
     })
     ->create();

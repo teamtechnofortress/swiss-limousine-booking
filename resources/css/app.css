@@ -9,3 +9,55 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+@layer components {
+    .admin-card { @apply rounded-2xl border border-slate-200 bg-white shadow-[0_8px_30px_rgb(15_23_42/0.04)]; }
+    .admin-input { @apply mt-1.5 block w-full rounded-xl border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-900 focus:ring-3 focus:ring-slate-900/10; }
+    .admin-label { @apply block text-xs font-bold uppercase tracking-[.12em] text-slate-500; }
+    .admin-button { @apply inline-flex items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-3 focus:ring-slate-900/20 disabled:cursor-not-allowed disabled:opacity-50; }
+    .admin-button-soft { @apply inline-flex items-center justify-center rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-200; }
+    .admin-table { @apply min-w-full divide-y divide-slate-100 text-left text-sm; }
+    .admin-table th { @apply px-5 py-3 text-[10px] font-bold uppercase tracking-[.12em] text-slate-400; }
+    .admin-table td { @apply px-5 py-4 align-middle text-slate-600; }
+    .admin-table tbody tr { @apply transition hover:bg-slate-50/80; }
+
+    /* Vehicle module: explicit layout keeps the server fallback and Vite build visually identical. */
+    .vehicle-page-heading { align-items: flex-end; }
+    .vehicle-toolbar { display: flex; align-items: center; justify-content: space-between; }
+    .vehicle-search { width: min(100%, 52rem); }
+    .vehicle-search input { min-width: 15rem; }
+    .vehicle-reorder { display: flex; align-items: center; justify-content: space-between; }
+    .vehicle-list-header { display: none; }
+    .vehicle-index #vehicle-list > article { transition: background-color .18s ease; }
+    .vehicle-index #vehicle-list > article:hover { background: #fbfcff; }
+    .vehicle-editor [data-vehicle-wizard] { overflow-x: auto; padding-bottom: .25rem; }
+    .vehicle-editor [data-vehicle-wizard] button { white-space: nowrap; }
+    .vehicle-editor [data-vehicle-panel] { min-height: 31rem; }
+    .vehicle-editor [data-fleet-panel], .vehicle-editor [data-no-fleet-warning] { transition: opacity .18s ease; }
+    .vehicle-editor [data-media-panel] { max-width: 72rem; }
+    .vehicle-categories details summary { list-style: none; }
+    .vehicle-categories details summary::-webkit-details-marker { display: none; }
+    .vehicle-categories .size-14 { width: 3.5rem; height: 3.5rem; }
+
+    @media (min-width: 1024px) {
+        .vehicle-index #vehicle-list > article,
+        .vehicle-index .vehicle-list-header {
+            display: grid;
+            grid-template-columns: 32px minmax(280px, 1.5fr) minmax(130px, .7fr) minmax(150px, .8fr) 130px 96px;
+            gap: 1.25rem;
+            align-items: center;
+        }
+        .vehicle-index .vehicle-list-header { display: grid; }
+        .vehicle-index #vehicle-list > article > div:first-of-type { display: block; }
+        .vehicle-index #vehicle-list .size-16 { width: 4rem; height: 4rem; }
+        .vehicle-editor form[data-vehicle-form] { display: grid; grid-template-columns: minmax(0, 1fr) 290px; align-items: start; }
+        .vehicle-editor form[data-vehicle-form] > aside { position: sticky; top: 6rem; }
+        .vehicle-categories > .grid { grid-template-columns: minmax(0, 1fr) 22.5rem; }
+    }
+
+    @media (max-width: 1023px) {
+        .vehicle-toolbar, .vehicle-reorder { align-items: stretch; }
+        .vehicle-search { width: 100%; }
+        .vehicle-index #vehicle-list > article { display: grid; grid-template-columns: minmax(0, 1fr); }
+    }
+}

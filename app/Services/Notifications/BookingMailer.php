@@ -5,13 +5,14 @@ namespace App\Services\Notifications;
 use App\Enums\BookingStatus;
 use App\Models\Booking;
 use App\Services\Settings\SettingsService;
-use Illuminate\Mail\Message;
-use Illuminate\Support\Facades\Mail;
 
 /** Plain-text customer emails. Wording lives here until notification templates are built. */
 final class BookingMailer
 {
-    public function __construct(private readonly SettingsService $settings) {}
+    public function __construct(
+        private readonly SettingsService $settings,
+        private readonly MailSettingsService $mail,
+    ) {}
 
     public function received(Booking $booking, string $accessToken, ?string $verificationToken): void
     {
@@ -92,17 +93,12 @@ final class BookingMailer
     /** @param list<string> $lines */
     private function send(Booking $booking, string $subject, array $lines): void
     {
-        $body = implode("\n", $lines);
-
-        Mail::raw($body, function (Message $message) use ($booking, $subject): void {
-            $message->to($booking->customer_email)->subject($subject);
-
-            $replyTo = $this->settings->string('company_email');
-
-            if ($replyTo !== '') {
-                $message->replyTo($replyTo);
-            }
-        });
+        $this->mail->send(
+            $booking->customer_email,
+            $subject,
+            implode("\n", $lines),
+            $this->settings->string('company_email') ?: null,
+        );
     }
 
     private function money(int $rappen): string
