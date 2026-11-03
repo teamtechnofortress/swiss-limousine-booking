@@ -12,6 +12,7 @@ final readonly class QuoteSnapshot
      * @param list<array<string, mixed>> $legs
      * @param array<int, array<string, mixed>> $offers keyed by vehicle id
      * @param list<string> $paymentMethods
+     * @param array<string, mixed> $context
      */
     public function __construct(
         public string $token,
@@ -22,6 +23,7 @@ final readonly class QuoteSnapshot
         public array $legs,
         public array $offers,
         public array $paymentMethods,
+        public array $context = [],
     ) {}
 
     /** @return array<string, mixed> */
@@ -42,6 +44,7 @@ final readonly class QuoteSnapshot
             'legs' => $this->legs,
             'offers' => $this->offers,
             'payment_methods' => $this->paymentMethods,
+            'context' => $this->context,
         ];
     }
 
@@ -57,6 +60,7 @@ final readonly class QuoteSnapshot
             legs: $data['legs'],
             offers: $data['offers'],
             paymentMethods: $data['payment_methods'],
+            context: $data['context'] ?? [],
         );
     }
 }

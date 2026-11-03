@@ -78,6 +78,22 @@ final class GoogleMapsClient
             ->all();
     }
 
+    /** @return list<array{place_id: string, name: string}> */
+    public function locationPredictions(string $input): array
+    {
+        $predictions = $this->http()
+            ->withHeaders(['X-Goog-FieldMask' => 'suggestions.placePrediction.placeId,suggestions.placePrediction.text.text'])
+            ->post(self::PLACES_AUTOCOMPLETE_URL, ['input' => $input])
+            ->throw()
+            ->json('suggestions', []);
+
+        return collect($predictions)
+            ->map(fn (array $suggestion): ?array => $suggestion['placePrediction'] ?? null)
+            ->filter(fn (?array $prediction): bool => isset($prediction['placeId'], $prediction['text']['text']))
+            ->map(fn (array $prediction): array => ['place_id' => (string) $prediction['placeId'], 'name' => (string) $prediction['text']['text']])
+            ->values()->all();
+    }
+
     /** @return array{code: string, name: string}|null */
     public function countryForPlace(string $placeId): ?array
     {
@@ -105,6 +121,48 @@ final class GoogleMapsClient
         }
 
         return ['code' => $code, 'name' => $name];
+    }
+
+    /**
+     * Place details intentionally fetched only after an administrator chooses a suggestion.
+     * Customer searches do not create catalogue locations.
+     *
+     * @return array{google_place_id:string,name:string,formatted_address:string,country_code:string,locality:?string,admin_area_code:?string,admin_area_name:?string,latitude:float,longitude:float}
+     */
+    public function catalogueLocationDetails(string $placeId): array
+    {
+        $response = $this->http()
+            ->withHeaders(['X-Goog-FieldMask' => 'id,displayName,formattedAddress,location,addressComponents'])
+            ->get(self::PLACES_URL.rawurlencode($placeId))
+            ->throw()
+            ->json();
+
+        if (! is_array($response) || ! isset($response['location'])) {
+            throw new RuntimeException('Google returned no usable details for this location.');
+        }
+
+        $components = collect($response['addressComponents'] ?? []);
+        $find = fn (string $type): ?array => $components->first(fn (array $component): bool => in_array($type, $component['types'] ?? [], true));
+        $country = $find('country');
+        $locality = $find('locality');
+        $adminArea = $find('administrative_area_level_1');
+        $countryCode = strtoupper((string) ($country['shortText'] ?? ''));
+
+        if (! preg_match('/^[A-Z]{2}$/', $countryCode)) {
+            throw new RuntimeException('Google did not return a country code for this location.');
+        }
+
+        return [
+            'google_place_id' => (string) ($response['id'] ?? $placeId),
+            'name' => trim((string) ($response['displayName']['text'] ?? $response['formattedAddress'] ?? '')),
+            'formatted_address' => trim((string) ($response['formattedAddress'] ?? '')),
+            'country_code' => $countryCode,
+            'locality' => $locality['longText'] ?? null,
+            'admin_area_code' => $adminArea['shortText'] ?? null,
+            'admin_area_name' => $adminArea['longText'] ?? null,
+            'latitude' => (float) $response['location']['latitude'],
+            'longitude' => (float) $response['location']['longitude'],
+        ];
     }
 
     private function fetchPlace(string $placeId, ?string $sessionToken): PlaceData

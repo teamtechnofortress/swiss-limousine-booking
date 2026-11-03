@@ -39,6 +39,27 @@
     .vehicle-categories details summary::-webkit-details-marker { display: none; }
     .vehicle-categories .size-14 { width: 3.5rem; height: 3.5rem; }
 
+    [data-trip-gallery-item][data-dragging="true"] { opacity: .45; }
+    [data-trip-gallery-item][data-drag-over="true"] { outline: 2px solid var(--color-indigo-500); outline-offset: 2px; }
+    [data-trip-location-picker][data-input-name="stop_location_ids"] { display: none; }
+    [data-trip-editor-toolbar] button[data-active="true"] { background: var(--color-indigo-600); color: white; box-shadow: 0 0 0 2px rgb(79 70 229 / .18); }
+    [data-editor-menu] > button { display: inline-flex; align-items: center; gap: .35rem; }
+    [data-editor-menu] > button::after { content: '⌄'; font-size: .7em; opacity: .65; }
+    [data-editor-menu-options] { display: none; position: absolute; z-index: 20; top: calc(100% + .4rem); left: 0; min-width: 10rem; overflow: hidden; border: 1px solid var(--color-slate-200); border-radius: .75rem; background: white; padding: .25rem; box-shadow: 0 12px 28px rgb(15 23 42 / .15); }
+    [data-editor-menu]:hover [data-editor-menu-options], [data-editor-menu]:focus-within [data-editor-menu-options] { display: grid; }
+    [data-editor-menu-options] button { border-radius: .5rem; padding: .5rem .65rem; text-align: left; font-size: .75rem; font-weight: 700; color: var(--color-slate-700); }
+    [data-editor-menu-options] button:hover, [data-editor-menu-options] button:focus-visible { background: var(--color-indigo-50); color: var(--color-indigo-700); outline: none; }
+    [data-trip-rich-editor] p { margin: .75rem 0; }
+    [data-trip-rich-editor] h1 { margin: 2rem 0 .75rem; font-size: 1.875rem; font-weight: 800; line-height: 1.2; color: var(--color-slate-950); }
+    [data-trip-rich-editor] h2 { margin: 1.75rem 0 .75rem; font-size: 1.5rem; font-weight: 800; line-height: 1.25; color: var(--color-slate-950); }
+    [data-trip-rich-editor] h3 { margin: 1.5rem 0 .5rem; font-size: 1.2rem; font-weight: 800; line-height: 1.35; color: var(--color-slate-900); }
+    [data-trip-rich-editor] h4, [data-trip-rich-editor] h5 { margin: 1.25rem 0 .5rem; font-size: 1rem; font-weight: 800; color: var(--color-slate-800); }
+    [data-trip-rich-editor] ul { margin: .75rem 0; padding-left: 1.5rem; list-style: disc; }
+    [data-trip-rich-editor] ol { margin: .75rem 0; padding-left: 1.5rem; list-style: decimal; }
+    [data-trip-rich-editor] li { margin: .25rem 0; }
+    [data-trip-rich-editor] blockquote { margin: 1rem 0; border-left: 3px solid var(--color-indigo-400); padding-left: 1rem; color: var(--color-slate-600); font-style: italic; }
+    [data-trip-rich-editor] a { color: var(--color-indigo-700); text-decoration: underline; text-underline-offset: 3px; }
+
     @media (min-width: 1024px) {
         .vehicle-index #vehicle-list > article,
         .vehicle-index .vehicle-list-header {

@@ -25,6 +25,7 @@ class Booking extends Model
         'vat_registration_number', 'price_breakdown', 'access_token_hash', 'verification_token_hash',
         'hold_expires_at', 'verified_at', 'paid_at', 'admin_seen_at',
         'cancellation_requested_at', 'cancellation_reason', 'cancelled_at', 'completed_at',
+        'type', 'trip_id',
     ];
 
     protected function casts(): array
@@ -48,6 +49,11 @@ class Booking extends Model
     public function vehicle(): BelongsTo
     {
         return $this->belongsTo(Vehicle::class)->withTrashed();
+    }
+
+    public function trip(): BelongsTo
+    {
+        return $this->belongsTo(Trip::class)->withTrashed();
     }
 
     public function fleetUnit(): BelongsTo
@@ -78,6 +84,11 @@ class Booking extends Model
     public function paymentAttempts(): HasMany
     {
         return $this->hasMany(PaymentAttempt::class);
+    }
+
+    public function extras(): HasMany
+    {
+        return $this->hasMany(BookingExtra::class);
     }
 
     public function transitionTo(BookingStatus $next): void

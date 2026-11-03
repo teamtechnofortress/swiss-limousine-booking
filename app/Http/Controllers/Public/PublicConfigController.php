@@ -20,6 +20,15 @@ final class PublicConfigController extends Controller
         $turnstileEnabled = $settings->bool('turnstile_enabled');
 
         $config = [
+            'site' => [
+                'name' => $settings->string('site_name'),
+                'logo_url' => $settings->string('site_logo_url') ?: null,
+                'contact' => [
+                    'email' => $settings->string('company_email') ?: null,
+                    'phone' => $settings->string('company_phone') ?: null,
+                    'address' => $settings->string('company_address') ?: null,
+                ],
+            ],
             'google_browser_key' => $settings->string('google_browser_key'),
             'currency' => $settings->string('currency'),
             'turnstile_enabled' => $turnstileEnabled,

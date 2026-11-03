@@ -12,6 +12,7 @@ use App\Services\Availability\AvailabilityService;
 use App\Services\Geo\GoogleMapsClient;
 use App\Services\Geo\RouteProvider;
 use App\Services\Geo\ServiceAreaValidator;
+use App\Services\Locations\PickupRestrictionService;
 use App\Services\Pricing\PricingService;
 use App\Services\Pricing\VatCalculator;
 use App\Services\Settings\SettingsService;
@@ -23,6 +24,7 @@ final class QuoteService
         private readonly GoogleMapsClient $maps,
         private readonly RouteProvider $routes,
         private readonly ServiceAreaValidator $serviceArea,
+        private readonly PickupRestrictionService $pickupRestriction,
         private readonly PricingService $pricing,
         private readonly VatCalculator $vat,
         private readonly AvailabilityService $availability,
@@ -38,6 +40,7 @@ final class QuoteService
 
         $pickup = $this->maps->placeDetails($request->pickupPlaceId, $request->pickupSessionToken);
         $dropoff = $this->maps->placeDetails($request->dropoffPlaceId, $request->dropoffSessionToken);
+        $this->pickupRestriction->assertAllowed($pickup->placeId);
         $this->serviceArea->assertAllowed($pickup, $dropoff);
 
         $outboundRoute = $this->routes->metrics($pickup->placeId, $dropoff->placeId);

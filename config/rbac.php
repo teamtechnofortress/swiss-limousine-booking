@@ -32,6 +32,7 @@ return [
             'bookings.edit' => 'Edit booking details',
             'bookings.assign' => 'Assign vehicle units',
             'bookings.create_manual' => 'Create manual bookings',
+            'bookings.override_pickup' => 'Override restricted pickup for a manual booking',
             'bookings.cancel' => 'Cancel bookings',
             'bookings.waiting' => 'Record waiting time',
         ],
@@ -46,6 +47,9 @@ return [
         'locations' => [
             'locations.manage' => 'Manage locations',
             'routes.manage' => 'Manage routes',
+        ],
+        'trips' => [
+            'trips.manage' => 'Manage day trips',
         ],
         'settings' => [
             'service_area.manage' => 'Manage service area',
@@ -78,9 +82,9 @@ return [
             'permissions' => [
                 'dashboard.view',
                 'bookings.view', 'bookings.edit', 'bookings.assign', 'bookings.create_manual',
-                'bookings.cancel', 'bookings.waiting',
+                'bookings.cancel', 'bookings.waiting', 'bookings.override_pickup',
                 'payments.view', 'payments.mark_paid', 'payments.refund',
-                'fleet.manage', 'locations.manage', 'routes.manage', 'service_area.manage',
+                'fleet.manage', 'locations.manage', 'routes.manage', 'trips.manage', 'service_area.manage',
                 'payment_methods.manage', 'pricing.manage',
                 'reports.tax.view', 'company.manage', 'notifications.manage', 'audit.view',
             ],

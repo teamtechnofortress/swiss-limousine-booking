@@ -59,6 +59,12 @@ final class SettingsSeeder extends Seeder
 
             // Locations
             'place_match_radius_m' => $this->def('locations', 'int', '2000', 'An address within this distance of a saved location uses that location\'s stored route.', false, 'locations.manage'),
+            'restrict_pickups_enabled' => $this->def('locations', 'bool', '0', 'Master switch: restrict customer pickups to active allowed locations.', false, 'locations.manage'),
+            'restricted_pickup_message' => $this->def('locations', 'string', 'Choose an available pickup location to continue.', 'Shown when a customer selects a pickup outside the allowed list.', false, 'locations.manage'),
+
+            // Trips
+            'trips_enabled' => $this->def('trips', 'bool', '1', 'Master switch for published day tours and trip bookings.', false, 'trips.manage'),
+            'trip_min_notice_hours' => $this->def('trips', 'int', '48', 'Minimum notice before a customer can book a trip departure.', false, 'trips.manage'),
 
             // Availability
             'default_slot_check_enabled' => $this->def('availability', 'bool', '1', 'Starting value of the slot check for new vehicles.', false, 'fleet.manage'),
@@ -91,6 +97,8 @@ final class SettingsSeeder extends Seeder
             'turnstile_enabled' => $this->def('security', 'bool', '1', 'Requires a bot check on quote and booking requests. Turn off only in local development.', false, 'integrations.manage'),
 
             // Company
+            'site_name' => $this->def('company', 'string', 'Swiss Limousine', 'Name shown in the public website header, browser title and customer-facing pages.', false, 'company.manage'),
+            'site_logo_url' => $this->def('company', 'string', '', 'Public HTTPS URL or site-relative path for the logo shown in the customer website header. Leave blank to use the site name.', false, 'company.manage'),
             'company_legal_name' => $this->def('company', 'string', '', 'Legal name printed on receipts and emails.', false, 'company.manage'),
             'company_email' => $this->def('company', 'string', '', 'Reply-to address and contact on customer emails.', false, 'company.manage'),
             'company_phone' => $this->def('company', 'string', '', 'Phone number shown in emails.', false, 'company.manage'),

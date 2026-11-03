@@ -24,13 +24,14 @@
             @can('payments.view')<x-admin.nav-link :href="route('admin.payments.index')" :active="request()->routeIs('admin.payments.*')" icon="card">Payments</x-admin.nav-link>@endcan
             <p class="px-3 pt-7 pb-2 text-[10px] font-bold uppercase tracking-[.18em] text-slate-600">Configuration</p>
             @can('fleet.manage')<x-admin.nav-link :href="route('admin.vehicles.index')" :active="request()->routeIs('admin.vehicles.*')" icon="car">Vehicles</x-admin.nav-link>@endcan
-            @can('locations.manage')<x-admin.nav-link :href="route('admin.workspace', 'locations')" :active="request('module') === 'locations'" icon="pin">Locations & routes</x-admin.nav-link>@endcan
+            @can('locations.manage')<x-admin.nav-link :href="route('admin.locations.index')" :active="request()->routeIs('admin.locations.*')" icon="pin">Locations</x-admin.nav-link>@endcan
+            @can('trips.manage')<x-admin.nav-link :href="route('admin.trips.index')" :active="request()->routeIs('admin.trips.*')" icon="calendar">Trips</x-admin.nav-link>@endcan
             <x-admin.nav-link :href="route('admin.settings.index')" :active="request()->routeIs('admin.settings.*')" icon="sliders">Settings</x-admin.nav-link>
             @can('integrations.view')<x-admin.nav-link :href="route('admin.mail.show')" :active="request()->routeIs('admin.mail.*')" icon="mail">Mail delivery</x-admin.nav-link>@endcan
-            <p class="px-3 pt-7 pb-2 text-[10px] font-bold uppercase tracking-[.18em] text-slate-600">Administration</p>
+            {{-- <p class="px-3 pt-7 pb-2 text-[10px] font-bold uppercase tracking-[.18em] text-slate-600">Administration</p>
             @can('users.manage')<x-admin.nav-link :href="route('admin.team.index')" :active="request()->routeIs('admin.team.*')" icon="users">Team</x-admin.nav-link><x-admin.nav-link :href="route('admin.roles.index')" :active="request()->routeIs('admin.roles.*')" icon="shield">Roles & access</x-admin.nav-link>@endcan
             @can('reports.tax.view')<x-admin.nav-link :href="route('admin.workspace', 'reports')" :active="request('module') === 'reports'" icon="chart">Reports</x-admin.nav-link>@endcan
-            @can('audit.view')<x-admin.nav-link :href="route('admin.workspace', 'audit')" :active="request('module') === 'audit'" icon="history">Audit log</x-admin.nav-link>@endcan
+            @can('audit.view')<x-admin.nav-link :href="route('admin.workspace', 'audit')" :active="request('module') === 'audit'" icon="history">Audit log</x-admin.nav-link>@endcan --}}
         </nav>
         <div class="mt-auto border-t border-slate-800 pt-4">
             <div class="flex items-center gap-3 px-3 py-2"><span class="grid size-8 place-items-center rounded-full bg-slate-800 text-xs font-bold text-amber-300">{{ str(auth()->user()->name)->substr(0, 1) }}</span><div class="min-w-0"><p class="truncate text-sm font-medium text-white">{{ auth()->user()->name }}</p><p class="truncate text-xs text-slate-500">{{ auth()->user()->getRoleNames()->first() }}</p></div></div>
@@ -47,6 +48,8 @@
                         @can('bookings.view')<a href="{{ route('admin.bookings.index') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Bookings</a>@endcan
                         @can('payments.view')<a href="{{ route('admin.payments.index') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Payments</a>@endcan
                         @can('fleet.manage')<a href="{{ route('admin.vehicles.index') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Vehicles</a>@endcan
+                        @can('locations.manage')<a href="{{ route('admin.locations.index') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Locations</a>@endcan
+                        @can('trips.manage')<a href="{{ route('admin.trips.index') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Trips</a>@endcan
                         <a href="{{ route('admin.settings.index') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Settings</a>
                         @can('users.manage')<a href="{{ route('admin.team.index') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Team</a>@endcan
                         <form method="POST" action="{{ route('admin.logout') }}" class="mt-1 border-t border-slate-100 pt-1">@csrf<button class="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-500 hover:bg-slate-50">Sign out</button></form>

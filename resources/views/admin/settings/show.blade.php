@@ -75,6 +75,18 @@
                             <input type="hidden" name="settings[allowed_countries]" data-country-codes>
                             <input type="hidden" name="settings[allowed_country_names]" data-country-names>
                         </div>
+                    @elseif($setting->key === 'site_logo_url')
+                        <div data-site-logo-upload data-upload-url="{{ route('admin.media.upload') }}">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <div class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50" data-site-logo-preview>
+                                    @if($current)<img src="{{ $current }}" alt="Current site logo" class="size-full object-contain">@else<span class="text-xs font-semibold text-slate-400">Logo</span>@endif
+                                </div>
+                                <div class="min-w-0 flex-1"><input data-site-logo-file class="block w-full text-sm text-slate-600" type="file" accept="image/jpeg,image/png,image/webp" @disabled(! $canEdit)><p class="mt-1 text-xs text-slate-500">PNG, JPG or WebP · max 4 MB. Uploading replaces the current logo.</p></div>
+                                @if($canEdit)<button data-site-logo-upload-button type="button" class="admin-button-soft">Upload logo</button>@endif
+                            </div>
+                            <p data-site-logo-upload-error class="mt-2 hidden text-xs font-medium text-rose-600"></p>
+                            <input data-site-logo-url id="setting_{{ $setting->key }}" class="admin-input mt-3" name="settings[{{ $setting->key }}]" value="{{ $current }}" placeholder="Or paste a public logo URL" @disabled(! $canEdit)>
+                        </div>
                     @elseif($setting->type === 'bool')
                         <input type="hidden" name="settings[{{ $setting->key }}]" value="0">
                         <label class="flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 @if(! $canEdit) opacity-60 @endif">
@@ -101,4 +113,11 @@
         @endforeach
         @if($canEdit)<div class="flex justify-end bg-slate-50 px-5 py-4"><button class="admin-button">Save {{ strtolower($title) }}</button></div>@endif
     </form>
+    <script>
+        (() => {
+            const root=document.querySelector('[data-site-logo-upload]');if(!root)return;
+            const file=root.querySelector('[data-site-logo-file]'),button=root.querySelector('[data-site-logo-upload-button]'),url=root.querySelector('[data-site-logo-url]'),preview=root.querySelector('[data-site-logo-preview]'),error=root.querySelector('[data-site-logo-upload-error]');
+            button?.addEventListener('click',async()=>{if(!file.files?.[0]){error.textContent='Choose a logo image first.';error.classList.remove('hidden');return;}button.disabled=true;button.textContent='Uploading…';error.classList.add('hidden');try{const body=new FormData();body.append('purpose','site_logo');body.append('file',file.files[0]);const response=await fetch(root.dataset.uploadUrl,{method:'POST',headers:{Accept:'application/json','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]').content},body}),json=await response.json();if(!response.ok)throw new Error(json.message||json.errors?.file?.[0]||'Logo upload failed.');url.value=json.data.url;preview.replaceChildren();const image=document.createElement('img');image.src=json.data.url;image.alt='Current site logo';image.className='size-full object-contain';preview.append(image);button.textContent='Uploaded';setTimeout(()=>button.textContent='Replace logo',1200);}catch(problem){error.textContent=problem.message;error.classList.remove('hidden');button.textContent='Upload logo';}finally{button.disabled=false;}});
+        })();
+    </script>
 </x-layouts.admin>

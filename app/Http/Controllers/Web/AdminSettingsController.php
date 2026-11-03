@@ -75,6 +75,10 @@ final class AdminSettingsController extends Controller
             ];
             $settings = $settings->sortBy(fn (Setting $setting): int => $order[$setting->key] ?? 100)->values();
         }
+        if ($group === 'company') {
+            $order = ['site_name' => 0, 'site_logo_url' => 10];
+            $settings = $settings->sortBy(fn (Setting $setting): int => $order[$setting->key] ?? 100)->values();
+        }
 
         return view('admin.settings.show', [
             'group' => $group,
@@ -211,6 +215,15 @@ final class AdminSettingsController extends Controller
 
         if ($setting->key === 'allowed_country_names') {
             return $this->countryNames($this->jsonValue($setting->key, $value));
+        }
+
+        if ($setting->key === 'site_logo_url') {
+            $url = trim((string) ($value ?? ''));
+            if ($url !== '' && ! str_starts_with($url, '/') && filter_var($url, FILTER_VALIDATE_URL) === false) {
+                throw ValidationException::withMessages(['settings.site_logo_url' => 'Enter a valid public URL or a site-relative path beginning with /.']);
+            }
+
+            return $url;
         }
 
         return match ($setting->type) {

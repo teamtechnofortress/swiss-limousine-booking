@@ -51,6 +51,11 @@ final class BookingException extends RuntimeException
         return new self('country_not_allowed', 'We do not currently serve trips to or from this country.');
     }
 
+    public static function pickupNotAllowed(string $message = ''): self
+    {
+        return new self('pickup_not_allowed', $message !== '' ? $message : 'Please choose one of the available pickup locations.');
+    }
+
     public static function requiredLocationMissing(string $name): self
     {
         return new self('required_location_missing', "Each trip must include {$name}.");

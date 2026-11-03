@@ -6,8 +6,11 @@ use App\Http\Controllers\Web\AdminDashboardController;
 use App\Http\Controllers\Web\AdminVehicleController;
 use App\Http\Controllers\Web\AdminVehicleCategoryController;
 use App\Http\Controllers\Web\AdminPaymentController;
+use App\Http\Controllers\Web\AdminLocationController;
+use App\Http\Controllers\Web\AdminTripController;
 use App\Http\Controllers\Web\AdminSettingsController;
 use App\Http\Controllers\Web\AdminUserController;
+use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/admin');
@@ -34,6 +37,39 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::post('payments/{payment}/refund', [AdminPaymentController::class, 'refund'])->name('payments.refund')->middleware('can:payments.refund');
 
         Route::get('fleet', fn () => redirect()->route('admin.vehicles.index'))->name('fleet.index')->middleware('can:fleet.manage');
+        Route::middleware('can:locations.manage')->group(function (): void {
+            Route::get('locations', [AdminLocationController::class, 'index'])->name('locations.index');
+            Route::get('locations/create', [AdminLocationController::class, 'create'])->name('locations.create');
+            Route::get('locations/search', [AdminLocationController::class, 'search'])->name('locations.search')->middleware('throttle:30,1');
+            Route::post('locations', [AdminLocationController::class, 'store'])->name('locations.store');
+            Route::post('locations/quick', [AdminLocationController::class, 'quickStore'])->name('locations.quick-store');
+            Route::get('locations/{location}/edit', [AdminLocationController::class, 'edit'])->name('locations.edit');
+            Route::patch('locations/{location}', [AdminLocationController::class, 'update'])->name('locations.update');
+            Route::delete('locations/{location}', [AdminLocationController::class, 'destroy'])->name('locations.destroy');
+            Route::post('locations/{location}/refresh', [AdminLocationController::class, 'refresh'])->name('locations.refresh');
+            Route::post('locations/{location}/hero', [AdminLocationController::class, 'hero'])->name('locations.hero');
+        });
+        Route::middleware('can:trips.manage')->group(function (): void {
+            Route::get('trips', [AdminTripController::class, 'index'])->name('trips.index');
+            Route::get('trips/create', [AdminTripController::class, 'create'])->name('trips.create');
+            Route::post('trips', [AdminTripController::class, 'store'])->name('trips.store');
+            Route::get('trips/{trip}/edit', [AdminTripController::class, 'edit'])->name('trips.edit');
+            Route::patch('trips/{trip}', [AdminTripController::class, 'update'])->name('trips.update');
+            Route::put('trips/{trip}/departures', [AdminTripController::class, 'departures'])->name('trips.departures');
+            Route::put('trips/{trip}/content', [AdminTripController::class, 'content'])->name('trips.content');
+            Route::put('trips/{trip}/items', fn () => abort(410))->name('trips.items');
+            Route::put('trips/{trip}/addons', [AdminTripController::class, 'addons'])->name('trips.addons');
+            Route::put('trips/{trip}/prices', [AdminTripController::class, 'prices'])->name('trips.prices');
+            Route::put('trips/{trip}/pricing', [AdminTripController::class, 'pricing'])->name('trips.pricing');
+            Route::get('trips/{trip}/pricing/estimates', [AdminTripController::class, 'pricingEstimates'])->name('trips.pricing.estimates');
+            Route::put('trips/{trip}/blackouts', [AdminTripController::class, 'blackouts'])->name('trips.blackouts');
+            Route::put('trips/{trip}/locations', [AdminTripController::class, 'locations'])->name('trips.locations');
+            Route::put('trips/{trip}/status', [AdminTripController::class, 'status'])->name('trips.status');
+            Route::post('trips/{trip}/cover', [AdminTripController::class, 'cover'])->name('trips.cover');
+            Route::post('trips/{trip}/gallery', [AdminTripController::class, 'gallery'])->name('trips.gallery');
+            Route::put('trips/{trip}/gallery/order', [AdminTripController::class, 'reorderGallery'])->name('trips.gallery.order');
+            Route::delete('trips/{trip}/gallery/{mediaId}', [AdminTripController::class, 'destroyGalleryImage'])->name('trips.gallery.destroy');
+        });
         Route::middleware('can:fleet.manage')->group(function (): void {
             Route::get('vehicle-categories', [AdminVehicleCategoryController::class, 'index'])->name('vehicle-categories.index');
             Route::post('vehicle-categories', [AdminVehicleCategoryController::class, 'store'])->name('vehicle-categories.store');
@@ -56,6 +92,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('settings/service-area/countries/{placeId}', [AdminSettingsController::class, 'resolveCountry'])->name('settings.service-area.country')->middleware(['can:service_area.manage', 'throttle:30,1'])->where('placeId', '[A-Za-z0-9_-]+');
         Route::get('settings/{group}', [AdminSettingsController::class, 'show'])->name('settings.show');
         Route::put('settings/{group}', [AdminSettingsController::class, 'update'])->name('settings.update');
+        Route::post('media/uploads', [AdminMediaController::class, 'store'])->name('media.upload')->middleware(['can:company.manage', 'throttle:30,1']);
         Route::get('mail', [AdminSettingsController::class, 'mail'])->name('mail.show')->middleware('can:integrations.view');
         Route::put('mail', [AdminSettingsController::class, 'updateMail'])->name('mail.update')->middleware('can:integrations.manage');
         Route::put('sender', [AdminSettingsController::class, 'updateSender'])->name('sender.update')->middleware('can:company.manage');

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\MailSettingsController;
+use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\UserController;
@@ -10,6 +11,8 @@ use App\Http\Controllers\Admin\VehicleCategoryController as AdminVehicleCategory
 use App\Http\Controllers\Admin\VehicleController as AdminVehicleController;
 use App\Http\Controllers\Public\BookingController;
 use App\Http\Controllers\Public\PublicConfigController;
+use App\Http\Controllers\Public\LocationChipController;
+use App\Http\Controllers\Public\TripController;
 use App\Http\Controllers\Public\QuoteController;
 use App\Http\Controllers\Public\VehicleController as PublicVehicleController;
 use App\Http\Controllers\Webhooks\StripeWebhookController;
@@ -21,6 +24,12 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('public')->group(function (): void {
     // This endpoint is deliberately limited to configuration safe for a public browser.
     Route::get('config', PublicConfigController::class);
+    Route::get('locations/chips', LocationChipController::class)->middleware('throttle:quote-read');
+    Route::get('trips', [TripController::class, 'index']);
+    Route::get('trips/{slug}', [TripController::class, 'show'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*');
+    Route::get('trips/{slug}/availability', [TripController::class, 'availability'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')->middleware('throttle:quote-read');
+    Route::post('trips/{slug}/quotes', [TripController::class, 'quote'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')->middleware('throttle:quotes');
+    Route::post('trips/{slug}/enquiries', [TripController::class, 'enquiry'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')->middleware('throttle:bookings');
 
     Route::get('vehicles', [PublicVehicleController::class, 'index']);
     Route::get('vehicles/{slug}', [PublicVehicleController::class, 'show'])
@@ -73,6 +82,8 @@ Route::prefix('admin')->group(function (): void {
     Route::middleware(['auth:sanctum', 'admin.active', 'throttle:admin'])->group(function (): void {
         Route::get('me', [AdminAuthController::class, 'me']);
         Route::post('auth/logout', [AdminAuthController::class, 'logout']);
+        Route::post('media/uploads', [AdminMediaController::class, 'store'])
+            ->middleware(['can:company.manage', 'throttle:30,1']);
 
         Route::get('integrations/mail', [MailSettingsController::class, 'show'])
             ->middleware('can:integrations.view');

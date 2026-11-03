@@ -21,6 +21,7 @@ use App\Repositories\Contracts\BookingRepositoryInterface;
 use App\Repositories\Contracts\VehicleRepositoryInterface;
 use App\Services\Availability\AvailabilityService;
 use App\Services\Payments\PaymentService;
+use App\Services\Locations\PickupRestrictionService;
 use App\Services\Quotes\QuoteStore;
 use App\Services\Settings\SettingsService;
 use Carbon\CarbonImmutable;
@@ -40,6 +41,7 @@ final class BookingService
         private readonly BookingLocker $locker,
         private readonly PaymentService $payments,
         private readonly SettingsService $settings,
+        private readonly PickupRestrictionService $pickupRestriction,
     ) {}
 
     /**
@@ -69,6 +71,7 @@ final class BookingService
             throw BookingException::quoteUnavailable();
         }
         $offer = $snapshot->offerFor($data->vehicleId);
+        $this->pickupRestriction->assertAllowed((string) ($snapshot->legs[0]['pickup']['place_id'] ?? ''));
         $total = (int) $offer['vat']['gross'];
 
         $this->assertPaymentMethodAllowed($data->paymentMethod, $total);
@@ -93,6 +96,8 @@ final class BookingService
 
                 $booking = $this->bookings->create([
                     'reference' => $this->newReference(),
+                    'type' => (string) ($snapshot->context['type'] ?? 'transfer'),
+                    'trip_id' => $snapshot->context['trip_id'] ?? null,
                     'quote_token_hash' => $quoteTokenHash,
                     'status' => $status,
                     'source' => 'website',
@@ -118,6 +123,8 @@ final class BookingService
                 ]);
 
                 foreach ($snapshot->legs as $index => $leg) {
+                    $pickupLocation = $this->pickupRestriction->matchingLocation((string) ($leg['pickup']['place_id'] ?? ''));
+                    $dropoffLocation = $this->pickupRestriction->matchingLocation((string) ($leg['dropoff']['place_id'] ?? ''));
                     $bookingLeg = $booking->legs()->create([
                         'direction' => $leg['direction'],
                         'pickup' => $leg['pickup'],
@@ -126,6 +133,8 @@ final class BookingService
                         'distance_m' => $leg['distance_m'],
                         'duration_s' => $leg['duration_s'],
                         'amount' => $offer['price']['legs'][$leg['direction']],
+                        'pickup_location_id' => $pickupLocation?->id,
+                        'dropoff_location_id' => $dropoffLocation?->id,
                     ]);
 
                     // Slot-check-off vehicles never get blocks.
@@ -140,6 +149,14 @@ final class BookingService
                             $holdUntil,
                         );
                     }
+                }
+
+                foreach (($snapshot->context['addons'] ?? []) as $extra) {
+                    $booking->extras()->create([
+                        'trip_addon_id' => $extra['trip_addon_id'] ?? null,
+                        'name' => $extra['name'], 'price_minor' => $extra['price_minor'],
+                        'quantity' => $extra['quantity'], 'total_minor' => $extra['total_minor'],
+                    ]);
                 }
 
                 $booking->payment()->create([
