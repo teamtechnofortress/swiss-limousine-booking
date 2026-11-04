@@ -41,6 +41,11 @@ final class BookingException extends RuntimeException
         return new self('no_vehicles_available', 'No vehicles are available for this trip.');
     }
 
+    public static function tripBookingUnavailable(): self
+    {
+        return new self('trip_booking_unavailable', 'This trip is no longer available for online booking. Please send us an enquiry instead.', 409);
+    }
+
     public static function unknownLocation(): self
     {
         return new self('unknown_location', 'Please choose your pickup and drop-off from the suggestions.');

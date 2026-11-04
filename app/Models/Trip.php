@@ -14,14 +14,14 @@ class Trip extends Model implements HasMedia
     use InteractsWithMedia, SoftDeletes;
 
     protected $fillable = [
-        'slug', 'title', 'subtitle', 'summary', 'description', 'region', 'duration_minutes', 'status',
-        'pricing_mode', 'fixed_departures_only', 'meeting_point_required', 'pickup_locations_only', 'min_travellers', 'max_travellers', 'is_featured', 'sort_order', 'meta_title',
+        'slug', 'title', 'subtitle', 'summary', 'description', 'region', 'status',
+        'pricing_mode', 'fixed_departures_only', 'meeting_point_required', 'pickup_locations_only', 'min_travellers', 'max_travellers', 'traveller_limits_enabled', 'is_featured', 'sort_order', 'meta_title',
         'meta_description', 'published_at',
     ];
 
     protected function casts(): array
     {
-        return ['is_featured' => 'boolean', 'fixed_departures_only' => 'boolean', 'meeting_point_required' => 'boolean', 'pickup_locations_only' => 'boolean', 'published_at' => 'datetime'];
+        return ['is_featured' => 'boolean', 'fixed_departures_only' => 'boolean', 'meeting_point_required' => 'boolean', 'pickup_locations_only' => 'boolean', 'traveller_limits_enabled' => 'boolean', 'published_at' => 'datetime'];
     }
 
     public function departures(): HasMany { return $this->hasMany(TripDeparture::class)->orderBy('sort_order'); }

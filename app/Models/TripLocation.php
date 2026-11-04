@@ -11,7 +11,7 @@ class TripLocation extends Model
     public const MAIN_DESTINATION = 'main_destination';
     public const STOP = 'stop';
 
-    protected $fillable = ['trip_id', 'location_id', 'role', 'sort_order'];
+    protected $fillable = ['trip_id', 'location_id', 'role', 'duration_minutes', 'sort_order'];
 
     public function trip(): BelongsTo { return $this->belongsTo(Trip::class); }
     public function location(): BelongsTo { return $this->belongsTo(Location::class)->withTrashed(); }

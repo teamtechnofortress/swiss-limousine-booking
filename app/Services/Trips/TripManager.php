@@ -19,9 +19,9 @@ final class TripManager
     {
         $data['slug'] = $this->uniqueSlug($data['slug'] ?? $data['title']);
         $data['pricing_mode'] ??= 'fixed';
-        $data['duration_minutes'] ??= 480;
         $data['min_travellers'] ??= 1;
         $data['max_travellers'] ??= 99;
+        $data['traveller_limits_enabled'] ??= true;
         return Trip::query()->create($data);
     }
 
@@ -86,7 +86,11 @@ final class TripManager
     public function replaceLocations(Trip $trip, array $data): void
     {
         $rows = [];
-        foreach (array_values(array_unique(array_map('intval', $data['pickup_location_ids'] ?? []))) as $id) $rows[] = ['location_id' => $id, 'role' => TripLocation::PICKUP];
+        $pickupIds = array_values(array_unique(array_map('intval', $data['pickup_location_ids'] ?? [])));
+        $existingDurations = $trip->tripLocations()
+            ->where('role', TripLocation::PICKUP)
+            ->pluck('duration_minutes', 'location_id');
+        foreach ($pickupIds as $id) $rows[] = ['location_id' => $id, 'role' => TripLocation::PICKUP, 'duration_minutes' => $existingDurations[$id] ?? null];
         if (! empty($data['main_destination_location_id'])) $rows[] = ['location_id' => (int) $data['main_destination_location_id'], 'role' => TripLocation::MAIN_DESTINATION];
         $ids = collect($rows)->pluck('location_id')->unique();
         if ($ids->isNotEmpty() && Location::query()->active()->whereIn('id', $ids)->count() !== $ids->count()) throw new RuntimeException('Trips can only use active locations from the Locations catalogue.');
@@ -94,6 +98,32 @@ final class TripManager
         DB::transaction(function () use ($trip, $rows): void {
             $trip->tripLocations()->delete();
             foreach ($rows as $index => $row) $trip->tripLocations()->create([...$row, 'sort_order' => $index]);
+        });
+    }
+
+    /** @param array<int, int> $durations */
+    public function replacePickupDurations(Trip $trip, array $durations): void
+    {
+        if (! $trip->pickup_locations_only) {
+            throw new RuntimeException('Enable selected pickup locations before configuring durations.');
+        }
+
+        $pickupLinks = $trip->tripLocations()->where('role', TripLocation::PICKUP)->get();
+        if ($pickupLinks->isEmpty()) {
+            throw new RuntimeException('Select at least one approved pickup location before configuring durations.');
+        }
+
+        foreach ($pickupLinks as $link) {
+            if (($durations[$link->location_id] ?? 0) < 1) {
+                throw new RuntimeException('Set a duration in minutes for every approved pickup location.');
+            }
+        }
+
+        DB::transaction(function () use ($trip, $durations): void {
+            $trip = Trip::query()->lockForUpdate()->findOrFail($trip->id);
+            foreach ($trip->tripLocations()->where('role', TripLocation::PICKUP)->lockForUpdate()->get() as $link) {
+                $link->update(['duration_minutes' => (int) $durations[$link->location_id]]);
+            }
         });
     }
 
@@ -128,17 +158,21 @@ final class TripManager
 
     private function pickupLocationsReady(Trip $trip): bool
     {
-        return $trip->tripLocations()
-            ->where('role', TripLocation::PICKUP)
-            ->whereHas('location', fn ($query) => $query->active()->when($this->settings->bool('restrict_pickups_enabled'), fn ($locations) => $locations->where('allowed_pickup', true)))
-            ->exists();
+        $pickups = $trip->tripLocations()->where('role', TripLocation::PICKUP);
+        $allowedLocation = fn ($query) => $query->active()
+            ->when($this->settings->bool('restrict_pickups_enabled'), fn ($locations) => $locations->where('allowed_pickup', true));
+
+        return $pickups->exists()
+            && ! (clone $pickups)->where(fn ($query) => $query->whereNull('duration_minutes')->orWhere('duration_minutes', '<=', 0))->exists()
+            && ! (clone $pickups)->whereDoesntHave('location', $allowedLocation)->exists();
     }
 
     private function pricingReady(Trip $trip, $vehicleIds): bool
     {
         if ($trip->pricing_mode === 'enquiry') return true;
         if ($trip->pricing_mode === 'distance') {
-            return $trip->tripLocations()->where('role', TripLocation::MAIN_DESTINATION)->exists();
+            return (! $trip->pickup_locations_only || $this->pickupLocationsReady($trip))
+                && $trip->tripLocations()->where('role', TripLocation::MAIN_DESTINATION)->exists();
         }
 
         if (! $trip->pickup_locations_only || ! $this->pickupLocationsReady($trip)) return false;
@@ -153,9 +187,13 @@ final class TripManager
 
     private function pricingRequirement(Trip $trip): string
     {
-        if ($trip->pricing_mode === 'distance') return 'Choose a primary destination for route-based pricing.';
+        if ($trip->pricing_mode === 'distance') {
+            return $trip->pickup_locations_only
+                ? 'Set a duration for every approved pickup location and choose a primary destination for route-based pricing.'
+                : 'Choose a primary destination for route-based pricing.';
+        }
         return ! $trip->pickup_locations_only
             ? 'Enable selected pickup locations before using fixed trip prices.'
-            : 'Add at least one active vehicle price for every pickup location.';
+            : 'Set a duration and add at least one active vehicle price for every pickup location.';
     }
 }

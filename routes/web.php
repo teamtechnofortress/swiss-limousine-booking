@@ -63,6 +63,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
             Route::put('trips/{trip}/pricing', [AdminTripController::class, 'pricing'])->name('trips.pricing');
             Route::get('trips/{trip}/pricing/estimates', [AdminTripController::class, 'pricingEstimates'])->name('trips.pricing.estimates');
             Route::put('trips/{trip}/blackouts', [AdminTripController::class, 'blackouts'])->name('trips.blackouts');
+            Route::put('trips/{trip}/pickup-durations', [AdminTripController::class, 'pickupDurations'])->name('trips.pickup-durations');
             Route::put('trips/{trip}/locations', [AdminTripController::class, 'locations'])->name('trips.locations');
             Route::put('trips/{trip}/status', [AdminTripController::class, 'status'])->name('trips.status');
             Route::post('trips/{trip}/cover', [AdminTripController::class, 'cover'])->name('trips.cover');

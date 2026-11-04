@@ -16,6 +16,7 @@ use App\Models\Booking;
 use App\Models\BookingLeg;
 use App\Models\Payment;
 use App\Models\PaymentAttempt;
+use App\Models\Trip;
 use App\Models\Vehicle;
 use App\Repositories\Contracts\BookingRepositoryInterface;
 use App\Repositories\Contracts\VehicleRepositoryInterface;
@@ -89,6 +90,8 @@ final class BookingService
                 if ($existing !== null) {
                     return [$existing->load(['legs', 'payment', 'vehicle']), false];
                 }
+
+                $this->assertTripCanStillBeBooked($snapshot->context, true);
 
                 $vehicle = $this->vehicles->lockVehicle($data->vehicleId);
                 $windows = $this->legWindows($snapshot->legs);
@@ -188,6 +191,35 @@ final class BookingService
             $wasCreated ? $verificationToken : null,
             $wasCreated,
         );
+    }
+
+    /**
+     * A quote locks its price for its TTL, but it must not bypass an administrator changing
+     * a trip to enquiry-only, unpublishing it, or disabling trips after that quote was made.
+     *
+     * @param array<string, mixed> $context
+     */
+    private function assertTripCanStillBeBooked(array $context, bool $lockForUpdate = false): void
+    {
+        if (($context['type'] ?? null) !== 'trip') {
+            return;
+        }
+
+        if (! $this->settings->bool('trips_enabled')) {
+            throw BookingException::tripBookingUnavailable();
+        }
+
+        $tripId = (int) ($context['trip_id'] ?? 0);
+        $isBookable = $tripId > 0 && Trip::query()
+            ->published()
+            ->whereKey($tripId)
+            ->whereIn('pricing_mode', ['fixed', 'distance'])
+            ->when($lockForUpdate, fn ($query) => $query->lockForUpdate())
+            ->exists();
+
+        if (! $isBookable) {
+            throw BookingException::tripBookingUnavailable();
+        }
     }
 
     /**
