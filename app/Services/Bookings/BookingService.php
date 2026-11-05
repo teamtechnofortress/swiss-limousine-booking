@@ -22,6 +22,7 @@ use App\Repositories\Contracts\BookingRepositoryInterface;
 use App\Repositories\Contracts\VehicleRepositoryInterface;
 use App\Services\Availability\AvailabilityService;
 use App\Services\Payments\PaymentService;
+use App\Services\Payments\PaymentEventLogger;
 use App\Services\Locations\PickupRestrictionService;
 use App\Services\Quotes\QuoteStore;
 use App\Services\Settings\SettingsService;
@@ -41,6 +42,7 @@ final class BookingService
         private readonly AvailabilityService $availability,
         private readonly BookingLocker $locker,
         private readonly PaymentService $payments,
+        private readonly PaymentEventLogger $events,
         private readonly SettingsService $settings,
         private readonly PickupRestrictionService $pickupRestriction,
     ) {}
@@ -356,6 +358,13 @@ final class BookingService
                 $attempt->forceFill(['provider_reference' => $sessionId])->save();
             }
 
+            if ($payment->provider_reference === null) {
+                $payment->forceFill([
+                    'provider' => $attempt->provider,
+                    'provider_reference' => $sessionId,
+                ])->save();
+            }
+
             if (! $attempt->is_current) {
                 $attempt->forceFill([
                     'status' => PaymentAttemptStatus::Paid,
@@ -384,6 +393,75 @@ final class BookingService
             if (! in_array($booking->status, [BookingStatus::PendingPayment, BookingStatus::Expired], true)) {
                 // Money arrived for a cancelled or review-state booking. It is recorded; an admin decides on a refund.
                 Log::critical('Payment received for a booking that cannot be confirmed', [
+                    'reference' => $booking->reference,
+                    'status' => $booking->status->value,
+                ]);
+
+                return;
+            }
+
+            $this->settle($booking, $vehicle, paid: true);
+        });
+    }
+
+    /**
+     * Backup confirmation for payment_intent.succeeded. Checkout Session events remain the
+     * primary source, but this covers an interrupted or delayed Checkout delivery safely.
+     */
+    public function confirmOnlinePaymentIntent(int $attemptId, string $paymentIntent): void
+    {
+        $bookingId = PaymentAttempt::query()->whereKey($attemptId)->value('booking_id');
+
+        if ($bookingId === null) {
+            Log::error('PaymentIntent succeeded for an unknown payment attempt', ['attempt_id' => $attemptId, 'payment_intent' => $paymentIntent]);
+
+            return;
+        }
+
+        DB::transaction(function () use ($bookingId, $attemptId, $paymentIntent): void {
+            [$vehicle, $booking] = $this->locker->lock((int) $bookingId);
+            $payment = Payment::query()->where('booking_id', $booking->id)->lockForUpdate()->firstOrFail();
+            $attempt = PaymentAttempt::query()
+                ->whereKey($attemptId)
+                ->where('payment_id', $payment->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($attempt === null || ($attempt->provider_payment_intent !== null && $attempt->provider_payment_intent !== $paymentIntent)) {
+                Log::critical('PaymentIntent does not match its payment attempt', [
+                    'attempt_id' => $attemptId,
+                    'payment_intent' => $paymentIntent,
+                ]);
+
+                return;
+            }
+
+            if (! $attempt->is_current) {
+                $attempt->forceFill([
+                    'status' => PaymentAttemptStatus::Paid,
+                    'provider_payment_intent' => $paymentIntent,
+                    'paid_at' => CarbonImmutable::now('UTC'),
+                ])->save();
+
+                Log::critical('PaymentIntent succeeded for a superseded Checkout Session; manual review required', [
+                    'reference' => $booking->reference,
+                    'attempt_id' => $attempt->id,
+                    'payment_intent' => $paymentIntent,
+                ]);
+
+                return;
+            }
+
+            if (in_array($booking->status, [
+                BookingStatus::Confirmed, BookingStatus::Assigned, BookingStatus::InProgress, BookingStatus::Completed,
+            ], true)) {
+                return;
+            }
+
+            $this->payments->recordPaid($booking, $attempt, $paymentIntent);
+
+            if (! in_array($booking->status, [BookingStatus::PendingPayment, BookingStatus::Expired], true)) {
+                Log::critical('PaymentIntent succeeded for a booking that cannot be confirmed', [
                     'reference' => $booking->reference,
                     'status' => $booking->status->value,
                 ]);
@@ -437,6 +515,57 @@ final class BookingService
         });
     }
 
+    /**
+     * A delayed payment method failed after Checkout completed. The booking hold stays active
+     * so the customer can start a new Checkout Session before it expires.
+     */
+    public function failOnlineCheckout(int $attemptId, string $sessionId): void
+    {
+        $bookingId = PaymentAttempt::query()->whereKey($attemptId)->value('booking_id');
+
+        if ($bookingId === null) {
+            Log::warning('Checkout async payment failed for an unknown payment attempt', ['attempt_id' => $attemptId]);
+
+            return;
+        }
+
+        DB::transaction(function () use ($bookingId, $attemptId, $sessionId): void {
+            [, $booking] = $this->locker->lock((int) $bookingId);
+            $payment = Payment::query()->where('booking_id', $booking->id)->lockForUpdate()->firstOrFail();
+            $attempt = PaymentAttempt::query()
+                ->whereKey($attemptId)
+                ->where('payment_id', $payment->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($attempt === null || ($attempt->provider_reference !== null && $attempt->provider_reference !== $sessionId)) {
+                return;
+            }
+
+            if ($attempt->status === PaymentAttemptStatus::Paid) {
+                return;
+            }
+
+            $attempt->forceFill([
+                'provider_reference' => $sessionId,
+                'status' => PaymentAttemptStatus::Failed,
+            ])->save();
+
+            $this->events->payment('Checkout asynchronous payment failed; booking remains available for another attempt.', [
+                'booking_id' => $booking->id,
+                'booking_reference' => $booking->reference,
+                'payment_attempt_id' => $attempt->id,
+                'checkout_session_id' => $sessionId,
+                'attempt_status' => PaymentAttemptStatus::Failed->value,
+                'booking_status' => $booking->status->value,
+            ], 'warning');
+
+            if ($attempt->is_current && $booking->status === BookingStatus::PendingPayment) {
+                $this->payments->markFailed($booking);
+            }
+        });
+    }
+
     /** Releases holds that lapsed without payment or verification. Runs every minute from the scheduler. */
     public function expireStale(int $limit = 200): int
     {
@@ -482,6 +611,7 @@ final class BookingService
      */
     private function settle(Booking $booking, Vehicle $vehicle, bool $paid): void
     {
+        $previousStatus = $booking->status->value;
         $now = CarbonImmutable::now('UTC');
 
         $holdIsValid = $booking->status !== BookingStatus::Expired
@@ -513,6 +643,12 @@ final class BookingService
                 Log::warning('Booking needs review: the slot was taken after the hold ended', [
                     'reference' => $booking->reference,
                 ]);
+                $this->events->payment('Booking requires manual review after payment.', [
+                    'booking_id' => $booking->id,
+                    'booking_reference' => $booking->reference,
+                    'from_status' => $previousStatus,
+                    'to_status' => BookingStatus::NeedsReview->value,
+                ], 'warning');
 
                 return;
             }
@@ -538,6 +674,13 @@ final class BookingService
             'paid_at' => $paid ? $now : $booking->paid_at,
             'verified_at' => $paid ? $booking->verified_at : $now,
         ])->save();
+        $this->events->payment('Booking status updated after payment processing.', [
+            'booking_id' => $booking->id,
+            'booking_reference' => $booking->reference,
+            'from_status' => $previousStatus,
+            'to_status' => BookingStatus::Confirmed->value,
+            'payment_confirmed' => $paid,
+        ]);
 
         $bookingId = $booking->id;
         DB::afterCommit(fn () => event(new BookingConfirmed($bookingId)));
@@ -545,9 +688,16 @@ final class BookingService
 
     private function expireBooking(Booking $booking): void
     {
+        $previousStatus = $booking->status->value;
         $booking->blocks()->delete();
         $booking->transitionTo(BookingStatus::Expired);
         $booking->save();
+        $this->events->payment('Booking hold expired and status was updated.', [
+            'booking_id' => $booking->id,
+            'booking_reference' => $booking->reference,
+            'from_status' => $previousStatus,
+            'to_status' => BookingStatus::Expired->value,
+        ], 'warning');
     }
 
     /** @return array{0: BookingStatus, 1: BlockType, 2: ?CarbonImmutable, 3: ?string} */

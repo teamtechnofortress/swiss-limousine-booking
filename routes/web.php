@@ -84,6 +84,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
             Route::patch('vehicles/{vehicle}', [AdminVehicleController::class, 'update'])->name('vehicles.update');
             Route::delete('vehicles/{vehicle}', [AdminVehicleController::class, 'destroy'])->name('vehicles.destroy');
             Route::post('vehicles/{vehicle}/images', [AdminVehicleController::class, 'uploadImages'])->name('vehicles.images.store');
+            Route::put('vehicles/{vehicle}/images/order', [AdminVehicleController::class, 'reorderImages'])->name('vehicles.images.order');
             Route::post('vehicles/{vehicle}/images/{mediaId}/primary', [AdminVehicleController::class, 'makePrimaryImage'])->name('vehicles.images.primary');
             Route::delete('vehicles/{vehicle}/images/{mediaId}', [AdminVehicleController::class, 'destroyImage'])->name('vehicles.images.destroy');
         });
@@ -91,6 +92,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('settings', [AdminSettingsController::class, 'index'])->name('settings.index');
         Route::get('settings/service-area/countries', [AdminSettingsController::class, 'searchCountries'])->name('settings.service-area.countries')->middleware(['can:service_area.manage', 'throttle:30,1']);
         Route::get('settings/service-area/countries/{placeId}', [AdminSettingsController::class, 'resolveCountry'])->name('settings.service-area.country')->middleware(['can:service_area.manage', 'throttle:30,1'])->where('placeId', '[A-Za-z0-9_-]+');
+        Route::put('settings/payment-methods/stripe', [AdminSettingsController::class, 'updateStripe'])->name('settings.payment-methods.stripe');
         Route::get('settings/{group}', [AdminSettingsController::class, 'show'])->name('settings.show');
         Route::put('settings/{group}', [AdminSettingsController::class, 'update'])->name('settings.update');
         Route::post('media/uploads', [AdminMediaController::class, 'store'])->name('media.upload')->middleware(['can:company.manage', 'throttle:30,1']);

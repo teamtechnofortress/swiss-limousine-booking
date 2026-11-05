@@ -41,6 +41,8 @@
 
     [data-trip-gallery-item][data-dragging="true"] { opacity: .45; }
     [data-trip-gallery-item][data-drag-over="true"] { outline: 2px solid var(--color-indigo-500); outline-offset: 2px; }
+    [data-vehicle-gallery-item][data-dragging="true"] { opacity: .45; }
+    [data-vehicle-gallery-item][data-drag-over="true"] { outline: 2px solid var(--color-indigo-500); outline-offset: 2px; }
     [data-trip-location-picker][data-input-name="stop_location_ids"] { display: none; }
     [data-trip-editor-toolbar] button[data-active="true"] { background: var(--color-indigo-600); color: white; box-shadow: 0 0 0 2px rgb(79 70 229 / .18); }
     [data-editor-menu] > button { display: inline-flex; align-items: center; gap: .35rem; }

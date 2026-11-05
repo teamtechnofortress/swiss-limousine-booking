@@ -113,6 +113,50 @@
         @endforeach
         @if($canEdit)<div class="flex justify-end bg-slate-50 px-5 py-4"><button class="admin-button">Save {{ strtolower($title) }}</button></div>@endif
     </form>
+    @if($group === 'payment_methods')
+        <section class="admin-card mt-6 overflow-hidden">
+            <div class="border-b border-violet-100 bg-violet-50 px-5 py-4">
+                <p class="font-bold text-slate-900">Stripe setup</p>
+                <p class="mt-1 text-sm text-slate-600">Configure Stripe credentials and the webhook Stripe uses to confirm payments.</p>
+            </div>
+            <form method="POST" action="{{ route('admin.settings.payment-methods.stripe') }}" class="divide-y divide-slate-100">
+                @csrf
+                @method('PUT')
+                @foreach($stripeSettings as $setting)
+                    @php
+                        $current = old('settings.'.$setting->key, $setting->is_secret ? '' : ($values[$setting->key] ?? ''));
+                        $selectOptions = $setting->key === 'stripe_mode' ? ['test' => 'Test mode', 'live' => 'Live mode'] : [];
+                    @endphp
+                    <div class="grid gap-4 p-5 md:grid-cols-[minmax(0,1fr)_minmax(260px,420px)] md:items-center">
+                        <div>
+                            <label for="stripe_{{ $setting->key }}" class="font-semibold text-slate-900">{{ str($setting->key)->replace('_', ' ')->title() }}</label>
+                            <p class="mt-1 max-w-xl text-sm leading-5 text-slate-500">{{ $setting->description }}</p>
+                            @if($setting->is_secret)<p class="mt-2 text-xs font-semibold text-amber-700">Stored encrypted. Leave blank to keep the current value.</p>@endif
+                        </div>
+                        <div>
+                            @if($selectOptions !== [])
+                                <select id="stripe_{{ $setting->key }}" class="admin-input" name="settings[{{ $setting->key }}]" @disabled(! $canManageStripe)>@foreach($selectOptions as $value => $label)<option value="{{ $value }}" @selected($current === $value)>{{ $label }}</option>@endforeach</select>
+                            @else
+                                <input id="stripe_{{ $setting->key }}" class="admin-input" name="settings[{{ $setting->key }}]" type="{{ $setting->is_secret ? 'password' : 'text' }}" value="{{ $setting->is_secret ? '' : $current }}" @disabled(! $canManageStripe)>
+                            @endif
+                            @error('settings.'.$setting->key)<p class="mt-1 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+                    </div>
+                @endforeach
+                <div class="m-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p class="font-semibold text-slate-900">Stripe webhook destination</p>
+                    <p class="mt-1 text-sm leading-5 text-slate-500">Create a Stripe webhook endpoint with this URL, then paste its signing secret above. Select the Checkout, PaymentIntent, and refund events listed below.</p>
+                    <div class="mt-3 grid gap-2 text-xs text-slate-600 md:grid-cols-2">
+                        <p><span class="font-semibold text-slate-800">Checkout:</span> <code>checkout.session.completed</code>, <code>checkout.session.async_payment_succeeded</code>, <code>checkout.session.async_payment_failed</code>, <code>checkout.session.expired</code></p>
+                        <p><span class="font-semibold text-slate-800">PaymentIntent:</span> <code>payment_intent.succeeded</code>, <code>payment_intent.payment_failed</code>, <code>payment_intent.canceled</code></p>
+                        <p><span class="font-semibold text-slate-800">Refunds:</span> <code>refund.created</code>, <code>refund.updated</code>, <code>charge.refunded</code></p>
+                    </div>
+                    <input class="admin-input mt-3 font-mono text-xs" type="text" value="{{ $stripeWebhookUrl }}" readonly aria-label="Stripe webhook destination">
+                </div>
+                @if($canManageStripe)<div class="flex justify-end bg-slate-50 px-5 py-4"><button class="admin-button">Save Stripe settings</button></div>@endif
+            </form>
+        </section>
+    @endif
     <script>
         (() => {
             const root=document.querySelector('[data-site-logo-upload]');if(!root)return;

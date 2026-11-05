@@ -85,6 +85,25 @@ final class VehicleManagementTest extends TestCase
         $this->assertSame(1, Vehicle::query()->bookable()->count());
     }
 
+    public function test_public_fleet_detail_exposes_customer_safe_media_pricing_and_availability(): void
+    {
+        $vehicle = Vehicle::query()->create([
+            'name' => 'Public S-Class', 'slug' => 'public-s-class', 'category_id' => VehicleCategory::query()->where('slug', 'executive')->value('id'),
+            'passenger_capacity' => 3, 'luggage_capacity' => 2, 'price_per_km' => 475, 'minimum_fare' => 12000,
+            'amenities' => ['Wi-Fi', 'Bottled water'], 'slot_check_enabled' => false, 'is_active' => true,
+        ]);
+
+        $this->getJson("/api/public/vehicles/{$vehicle->slug}")
+            ->assertOk()
+            ->assertJsonPath('data.capacity.passengers', 3)
+            ->assertJsonPath('data.pricing.mode', 'distance')
+            ->assertJsonPath('data.pricing.price_per_km_minor', 475)
+            ->assertJsonPath('data.pricing.minimum_fare_minor', 12000)
+            ->assertJsonPath('data.availability.online_booking_enabled', true)
+            ->assertJsonPath('data.media.cover', null)
+            ->assertJsonCount(0, 'data.media.gallery');
+    }
+
     public function test_duplicate_plates_are_rejected_after_normalisation(): void
     {
         $this->postJson('/api/admin/vehicles', $this->payload())->assertCreated();

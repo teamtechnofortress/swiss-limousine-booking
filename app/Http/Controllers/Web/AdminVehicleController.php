@@ -11,8 +11,10 @@ use App\Models\VehicleCategory;
 use App\Services\Settings\SettingsService;
 use App\Services\Vehicles\VehicleManager;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Illuminate\Validation\ValidationException;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 final class AdminVehicleController extends Controller
@@ -90,42 +92,91 @@ final class AdminVehicleController extends Controller
         return redirect()->route('admin.vehicles.index')->with('status', 'Vehicle deleted.');
     }
 
-    public function uploadImages(Vehicle $vehicle, Request $request): RedirectResponse
+    public function uploadImages(Vehicle $vehicle, Request $request): RedirectResponse|JsonResponse
     {
-        $request->validate([
+        $data = $request->validate([
             'images' => ['required', 'array', 'min:1', 'max:12'],
             'images.*' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'make_primary' => ['nullable', 'boolean'],
         ]);
+        $uploaded = [];
         foreach ($request->file('images', []) as $image) {
-            $vehicle->addMedia($image)->toMediaCollection('images');
+            $uploaded[] = $vehicle->addMedia($image)->toMediaCollection('images');
+        }
+
+        if ($data['make_primary'] ?? false) {
+            $images = $vehicle->getMedia('images');
+            $newImage = last($uploaded);
+            if ($newImage !== null) {
+                $orderedIds = [$newImage->id, ...$images->pluck('id')->reject(fn ($id) => (int) $id === $newImage->id)->all()];
+                Media::setNewOrder($orderedIds);
+            }
         }
 
         activity('fleet')->causedBy($request->user())->performedOn($vehicle)->log('vehicle_images_added');
 
-        return back()->with('status', 'Vehicle images uploaded.');
+        return $this->mediaResponse($vehicle, $request, 'Vehicle images uploaded.');
     }
 
-    public function destroyImage(Vehicle $vehicle, int $mediaId, Request $request): RedirectResponse
+    public function destroyImage(Vehicle $vehicle, int $mediaId, Request $request): RedirectResponse|JsonResponse
     {
         $media = $vehicle->getMedia('images')->firstWhere('id', $mediaId);
         abort_if($media === null, 404);
         $media->delete();
         activity('fleet')->causedBy($request->user())->performedOn($vehicle)->log('vehicle_image_deleted');
 
-        return back()->with('status', 'Vehicle image removed.');
+        return $this->mediaResponse($vehicle, $request, 'Vehicle image removed.');
     }
 
-    public function makePrimaryImage(Vehicle $vehicle, int $mediaId, Request $request): RedirectResponse
+    public function makePrimaryImage(Vehicle $vehicle, int $mediaId, Request $request): RedirectResponse|JsonResponse
     {
         $images = $vehicle->getMedia('images');
         abort_unless($images->contains('id', $mediaId), 404);
 
-        $orderedIds = $images->pluck('id')->map(fn ($id) => (int) $id)->all();
-        $orderedIds = [$mediaId, ...array_values(array_filter($orderedIds, fn (int $id) => $id !== $mediaId))];
+        $orderedIds = [$mediaId, ...$images->pluck('id')->map(fn ($id) => (int) $id)->reject(fn (int $id) => $id === $mediaId)->all()];
         Media::setNewOrder($orderedIds);
         activity('fleet')->causedBy($request->user())->performedOn($vehicle)->log('vehicle_primary_image_changed');
 
-        return back()->with('status', 'Primary vehicle image updated.');
+        return $this->mediaResponse($vehicle, $request, 'Vehicle cover image updated.');
+    }
+
+    public function reorderImages(Vehicle $vehicle, Request $request): RedirectResponse|JsonResponse
+    {
+        $data = $request->validate(['media_ids' => ['required', 'array'], 'media_ids.*' => ['required', 'integer', 'distinct']]);
+        $ids = array_map('intval', $data['media_ids']);
+        $ownedIds = $vehicle->getMedia('images')->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+
+        if (count($ids) !== count($ownedIds) || collect($ids)->sort()->values()->all() !== $ownedIds) {
+            throw ValidationException::withMessages(['media_ids' => 'The image order must contain every image of this vehicle exactly once.']);
+        }
+
+        Media::setNewOrder($ids);
+        activity('fleet')->causedBy($request->user())->performedOn($vehicle)->log('vehicle_images_reordered');
+
+        return $this->mediaResponse($vehicle, $request, 'Vehicle image order saved.');
+    }
+
+    private function mediaResponse(Vehicle $vehicle, Request $request, string $message): RedirectResponse|JsonResponse
+    {
+        if (! $request->expectsJson()) return back()->with('status', $message);
+
+        return response()->json(['message' => $message, 'data' => [
+            'images' => $vehicle->fresh('media')->getMedia('images')->sortBy('order_column')->values()->map(fn (Media $media) => $this->mediaItem($media))->all(),
+        ]]);
+    }
+
+    /** @return array{id:int,url:string,thumbnail_url:string,name:string,order:int} */
+    private function mediaItem(Media $media): array
+    {
+        $url = $media->hasGeneratedConversion('web') ? $media->getUrl('web') : $media->getUrl();
+
+        return [
+            'id' => $media->id,
+            'url' => $url,
+            'thumbnail_url' => $media->hasGeneratedConversion('thumbnail') ? $media->getUrl('thumbnail') : $url,
+            'name' => $media->name,
+            'order' => $media->order_column,
+        ];
     }
 
     /** @return array<string, mixed> */

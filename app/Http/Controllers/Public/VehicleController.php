@@ -13,7 +13,7 @@ final class VehicleController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $data = $request->validate(['category' => ['nullable', 'string', 'max:100']]);
-        $vehicles = Vehicle::query()->where('is_active', true)->with(['category.media', 'media'])
+        $vehicles = Vehicle::query()->where('is_active', true)->with(['category.media', 'media'])->withCount('fleetUnits')
             ->whereHas('category', fn ($query) => $query->active())
             ->when($data['category'] ?? null, fn ($query, string $category) => $query->whereHas('category', fn ($categoryQuery) => $categoryQuery->where('slug', $category)))
             ->orderBy('sort_order')->orderBy('name')->get();
@@ -23,7 +23,7 @@ final class VehicleController extends Controller
 
     public function show(string $slug): VehicleResource
     {
-        $vehicle = Vehicle::query()->where('is_active', true)->where('slug', $slug)->whereHas('category', fn ($query) => $query->active())->with(['category.media', 'media'])->firstOrFail();
+        $vehicle = Vehicle::query()->where('is_active', true)->where('slug', $slug)->whereHas('category', fn ($query) => $query->active())->with(['category.media', 'media'])->withCount('fleetUnits')->firstOrFail();
 
         return new VehicleResource($vehicle);
     }

@@ -8,6 +8,7 @@ use App\Models\Setting;
 use App\Services\Notifications\MailSettingsService;
 use App\Services\Geo\GoogleMapsClient;
 use App\Services\Settings\SettingsService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -18,6 +19,14 @@ use Throwable;
 
 final class AdminSettingsController extends Controller
 {
+    /** @var list<string> */
+    private const STRIPE_SETTING_KEYS = [
+        'stripe_mode',
+        'stripe_publishable_key',
+        'stripe_secret_key',
+        'stripe_webhook_secret',
+    ];
+
     /** @var array<string, string> */
     private const GROUP_LABELS = [
         'integrations' => 'Integrations',
@@ -41,6 +50,11 @@ final class AdminSettingsController extends Controller
     {
         $groups = Setting::query()->selectRaw('`group`, count(*) as count')
             ->groupBy('group')->pluck('count', 'group');
+        $stripeSettingCount = Setting::query()->whereIn('key', self::STRIPE_SETTING_KEYS)->count();
+
+        // Stripe is stored as an integration, but administered from Payment methods.
+        $groups['integrations'] = max(0, (int) ($groups['integrations'] ?? 0) - $stripeSettingCount);
+        $groups['payment_methods'] = (int) ($groups['payment_methods'] ?? 0) + $stripeSettingCount;
 
         return view('admin.settings.index', [
             'groups' => collect(self::GROUP_LABELS)->map(fn (string $label, string $group) => [
@@ -60,7 +74,7 @@ final class AdminSettingsController extends Controller
         if ($group === 'integrations') {
             abort_unless($request->user()->can('integrations.view'), 403);
         }
-        $settings = Setting::query()->where('group', $group)->orderBy('key')->get();
+        $settings = $this->settingsForGroup($group);
         abort_if($settings->isEmpty(), 404);
 
         if ($group === 'service_area') {
@@ -86,13 +100,17 @@ final class AdminSettingsController extends Controller
             'settings' => $settings,
             'values' => $this->settings->all(),
             'canEdit' => $settings->every(fn (Setting $setting) => $request->user()->can($setting->editable_by)),
+            'stripeSettings' => $group === 'payment_methods' ? $this->stripeSettings() : collect(),
+            'canManageStripe' => $request->user()->can('integrations.manage'),
+            // Use the host of the admin site currently being visited, including any subdirectory.
+            'stripeWebhookUrl' => url(route('webhooks.payments', ['provider' => 'stripe'], false)),
         ]);
     }
 
     public function update(Request $request, string $group): RedirectResponse
     {
         $this->assertKnownGroup($group);
-        $records = Setting::query()->where('group', $group)->orderBy('key')->get();
+        $records = $this->settingsForGroup($group);
         abort_if($records->isEmpty(), 404);
         abort_unless($records->every(fn (Setting $setting) => $request->user()->can($setting->editable_by)), 403);
 
@@ -117,6 +135,35 @@ final class AdminSettingsController extends Controller
         }
 
         return back()->with('status', self::GROUP_LABELS[$group].' settings saved.');
+    }
+
+    /** Save Stripe credentials from the Payment methods screen without moving their stored group. */
+    public function updateStripe(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()->can('integrations.manage'), 403);
+
+        $records = $this->stripeSettings();
+        abort_if($records->isEmpty(), 404);
+
+        $input = $request->input('settings', []);
+        if (! is_array($input)) {
+            throw ValidationException::withMessages(['settings' => 'Invalid settings submission.']);
+        }
+
+        $normalised = [];
+        foreach ($records as $setting) {
+            $normalised[$setting->key] = $this->normalise($setting, $input[$setting->key] ?? null);
+        }
+        $this->assertStripeModeCanChange($normalised);
+
+        foreach ($records as $setting) {
+            if ($setting->is_secret && ($normalised[$setting->key] === null || $normalised[$setting->key] === '')) {
+                continue;
+            }
+            $this->settings->update($setting->key, $normalised[$setting->key], $request->user());
+        }
+
+        return back()->with('status', 'Stripe settings saved.');
     }
 
     public function searchCountries(Request $request, GoogleMapsClient $maps): JsonResponse
@@ -320,8 +367,37 @@ final class AdminSettingsController extends Controller
         if ($group === 'tax' && ! empty($values['vat_enabled']) && empty($values['vat_registration_number'])) {
             throw ValidationException::withMessages(['settings.vat_registration_number' => 'A VAT registration number is required when VAT is enabled.']);
         }
-        if ($group === 'integrations' && ($values['stripe_mode'] ?? null) !== $this->settings->string('stripe_mode') && Booking::query()->where('status', 'pending_payment')->exists()) {
+    }
+
+    /** @param array<string, mixed> $values */
+    private function assertStripeModeCanChange(array $values): void
+    {
+        if (($values['stripe_mode'] ?? null) !== $this->settings->string('stripe_mode') && Booking::query()->where('status', 'pending_payment')->exists()) {
             throw ValidationException::withMessages(['settings.stripe_mode' => 'Stripe mode cannot change while bookings are awaiting payment.']);
         }
+    }
+
+    /** @return Collection<int, Setting> */
+    private function settingsForGroup(string $group): Collection
+    {
+        $query = Setting::query()->where('group', $group);
+
+        if ($group === 'integrations') {
+            $query->whereNotIn('key', self::STRIPE_SETTING_KEYS);
+        }
+
+        return $query->orderBy('key')->get();
+    }
+
+    /** @return Collection<int, Setting> */
+    private function stripeSettings(): Collection
+    {
+        $order = array_flip(self::STRIPE_SETTING_KEYS);
+
+        return Setting::query()
+            ->whereIn('key', self::STRIPE_SETTING_KEYS)
+            ->get()
+            ->sortBy(fn (Setting $setting): int => $order[$setting->key])
+            ->values();
     }
 }
