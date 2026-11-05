@@ -154,3 +154,181 @@ document.querySelectorAll('[data-service-area-master]').forEach((master) => {
     matchType?.addEventListener('change', sync);
     sync();
 });
+
+document.querySelectorAll('[data-saved-location-picker]').forEach((picker) => {
+    const search = picker.querySelector('[data-saved-location-search]');
+    const results = picker.querySelector('[data-saved-location-results]');
+    const selectedBox = picker.querySelector('[data-saved-location-selected]');
+    const inputs = picker.querySelector('[data-saved-location-inputs]');
+    const status = picker.querySelector('[data-saved-location-status]');
+    const inputName = picker.dataset.inputName;
+    const multiple = picker.dataset.multiple === 'true';
+    const searchUrl = picker.dataset.searchUrl;
+    const disabled = search.disabled;
+    const cache = new Map();
+    let selected = new Map((JSON.parse(picker.dataset.selected || '[]')).map((location) => [Number(location.id), location]));
+    let debounce;
+    let request;
+    let requestVersion = 0;
+
+    const setStatus = (message = '', tone = 'slate') => {
+        status.textContent = message;
+        status.className = `mt-2 ${message ? '' : 'hidden '}text-xs font-medium ${tone === 'rose' ? 'text-rose-600' : 'text-slate-600'}`;
+    };
+
+    const close = () => {
+        results.replaceChildren();
+        results.classList.add('hidden');
+        search.setAttribute('aria-expanded', 'false');
+    };
+
+    const draw = () => {
+        selectedBox.replaceChildren();
+        inputs.replaceChildren();
+
+        selected.forEach((location, id) => {
+            const chip = document.createElement('span');
+            chip.className = `inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold ${location.is_active === false ? 'bg-amber-50 text-amber-800' : 'bg-indigo-50 text-indigo-800'}`;
+            const text = document.createElement('span');
+            text.className = 'truncate';
+            text.textContent = location.is_active === false ? `${location.name} (inactive)` : location.name;
+            chip.append(text);
+
+            if (!disabled) {
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'text-base leading-none text-indigo-500 hover:text-rose-600';
+                remove.setAttribute('aria-label', `Remove ${location.name}`);
+                remove.textContent = '×';
+                remove.addEventListener('click', () => {
+                    selected.delete(id);
+                    draw();
+                });
+                chip.append(remove);
+            }
+
+            selectedBox.append(chip);
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = multiple ? `${inputName}[]` : inputName;
+            hidden.value = String(id);
+            inputs.append(hidden);
+        });
+    };
+
+    const select = (location) => {
+        const id = Number(location.id);
+        if (!multiple) selected = new Map();
+        selected.set(id, location);
+        search.value = '';
+        setStatus();
+        close();
+        draw();
+        search.focus();
+    };
+
+    const render = (locations) => {
+        results.replaceChildren();
+        const available = locations.filter((location) => !selected.has(Number(location.id)));
+        if (available.length === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'px-3 py-2 text-sm text-slate-500';
+            empty.textContent = 'No matching active saved locations.';
+            results.append(empty);
+        }
+
+        available.forEach((location) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.role = 'option';
+            button.className = 'block w-full rounded-lg px-3 py-2 text-left hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none';
+            const name = document.createElement('span');
+            name.className = 'block text-sm font-semibold text-slate-800';
+            name.textContent = location.name;
+            const address = document.createElement('span');
+            address.className = 'block truncate text-xs text-slate-500';
+            address.textContent = location.address;
+            button.append(name, address);
+            button.addEventListener('click', () => select(location));
+            button.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    close();
+                    search.focus();
+                }
+            });
+            results.append(button);
+        });
+
+        results.classList.remove('hidden');
+        search.setAttribute('aria-expanded', 'true');
+    };
+
+    const lookup = async (query) => {
+        const cached = cache.get(query.toLowerCase());
+        if (cached && Date.now() - cached.createdAt < 30000) {
+            render(cached.locations);
+            return;
+        }
+
+        request?.abort();
+        request = new AbortController();
+        const version = ++requestVersion;
+        setStatus('Searching saved locations…');
+
+        try {
+            const response = await fetch(`${searchUrl}?q=${encodeURIComponent(query)}`, {
+                headers: { Accept: 'application/json' },
+                signal: request.signal,
+            });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload.message || 'Saved-location search is unavailable.');
+            if (version !== requestVersion) return;
+
+            const locations = payload.data || [];
+            cache.set(query.toLowerCase(), { createdAt: Date.now(), locations });
+            setStatus();
+            render(locations);
+        } catch (exception) {
+            if (exception.name !== 'AbortError') {
+                setStatus(exception.message || 'Saved-location search is unavailable.', 'rose');
+                close();
+            }
+        }
+    };
+
+    search.addEventListener('input', () => {
+        clearTimeout(debounce);
+        const query = search.value.trim();
+        if (query.length < 2) {
+            request?.abort();
+            requestVersion += 1;
+            setStatus(query.length === 1 ? 'Type one more character to search.' : '');
+            close();
+            return;
+        }
+        debounce = setTimeout(() => lookup(query), 300);
+    });
+
+    search.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            close();
+        } else if (event.key === 'ArrowDown' && !results.classList.contains('hidden')) {
+            event.preventDefault();
+            results.querySelector('button')?.focus();
+        } else if (event.key === 'Enter' && !results.classList.contains('hidden')) {
+            const firstResult = results.querySelector('button');
+            if (firstResult) {
+                event.preventDefault();
+                firstResult.click();
+            }
+        }
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!picker.contains(event.target)) close();
+    });
+    window.addEventListener('admin:location-created', () => cache.clear());
+
+    draw();
+});

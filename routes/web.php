@@ -95,6 +95,8 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::put('settings/payment-methods/stripe', [AdminSettingsController::class, 'updateStripe'])->name('settings.payment-methods.stripe');
         Route::get('settings/{group}', [AdminSettingsController::class, 'show'])->name('settings.show');
         Route::put('settings/{group}', [AdminSettingsController::class, 'update'])->name('settings.update');
+        // Read-only active catalogue search shared by trip and service-area pickers.
+        Route::get('locations/saved-search', [AdminLocationController::class, 'searchSaved'])->name('locations.saved-search')->middleware('throttle:60,1');
         Route::post('media/uploads', [AdminMediaController::class, 'store'])->name('media.upload')->middleware(['can:company.manage', 'throttle:30,1']);
         Route::get('mail', [AdminSettingsController::class, 'mail'])->name('mail.show')->middleware('can:integrations.view');
         Route::put('mail', [AdminSettingsController::class, 'updateMail'])->name('mail.update')->middleware('can:integrations.manage');

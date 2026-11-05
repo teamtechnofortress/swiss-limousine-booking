@@ -82,16 +82,18 @@ final class TripManager
         });
     }
 
-    /** @param array{pickup_location_ids?:list<int>,main_destination_location_id?:int|null} $data */
+    /** @param array{pickup_location_ids?:list<int>,main_destination_location_id?:int|null,stop_location_ids?:list<int>} $data */
     public function replaceLocations(Trip $trip, array $data): void
     {
         $rows = [];
         $pickupIds = array_values(array_unique(array_map('intval', $data['pickup_location_ids'] ?? [])));
+        $stopIds = array_values(array_unique(array_map('intval', $data['stop_location_ids'] ?? [])));
         $existingDurations = $trip->tripLocations()
             ->where('role', TripLocation::PICKUP)
             ->pluck('duration_minutes', 'location_id');
         foreach ($pickupIds as $id) $rows[] = ['location_id' => $id, 'role' => TripLocation::PICKUP, 'duration_minutes' => $existingDurations[$id] ?? null];
         if (! empty($data['main_destination_location_id'])) $rows[] = ['location_id' => (int) $data['main_destination_location_id'], 'role' => TripLocation::MAIN_DESTINATION];
+        foreach ($stopIds as $index => $id) $rows[] = ['location_id' => $id, 'role' => TripLocation::STOP, 'sort_order' => $index];
         $ids = collect($rows)->pluck('location_id')->unique();
         if ($ids->isNotEmpty() && Location::query()->active()->whereIn('id', $ids)->count() !== $ids->count()) throw new RuntimeException('Trips can only use active locations from the Locations catalogue.');
         if ($trip->pickup_locations_only && ! collect($rows)->contains('role', TripLocation::PICKUP)) throw new RuntimeException('Choose at least one approved pickup location before enabling the trip pickup restriction.');

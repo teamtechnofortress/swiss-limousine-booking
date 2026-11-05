@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\Location;
 use App\Models\Setting;
 use App\Services\Notifications\MailSettingsService;
 use App\Services\Geo\GoogleMapsClient;
@@ -94,14 +95,21 @@ final class AdminSettingsController extends Controller
             $settings = $settings->sortBy(fn (Setting $setting): int => $order[$setting->key] ?? 100)->values();
         }
 
+        $values = $this->settings->all();
+
         return view('admin.settings.show', [
             'group' => $group,
             'title' => self::GROUP_LABELS[$group],
             'settings' => $settings,
-            'values' => $this->settings->all(),
+            'values' => $values,
             'canEdit' => $settings->every(fn (Setting $setting) => $request->user()->can($setting->editable_by)),
             'stripeSettings' => $group === 'payment_methods' ? $this->stripeSettings() : collect(),
             'canManageStripe' => $request->user()->can('integrations.manage'),
+            // The picker retrieves active choices on demand. We only load the
+            // configured location so an existing selection can be rendered.
+            'requiredLocation' => $group === 'service_area'
+                ? Location::withTrashed()->find($values['required_location_id'] ?? null)
+                : null,
             // Use the host of the admin site currently being visited, including any subdirectory.
             'stripeWebhookUrl' => url(route('webhooks.payments', ['provider' => 'stripe'], false)),
         ]);
@@ -350,6 +358,10 @@ final class AdminSettingsController extends Controller
             if (! empty($values['service_area_enforced']) && ! empty($values['required_location_enabled'])) {
                 if (($values['required_location_id'] ?? null) === null) {
                     throw ValidationException::withMessages(['settings.required_location_id' => 'Choose a saved required location before enabling this rule.']);
+                }
+
+                if (! Location::query()->active()->whereKey($values['required_location_id'])->exists()) {
+                    throw ValidationException::withMessages(['settings.required_location_id' => 'Choose an active saved location from the list.']);
                 }
 
                 if (($values['required_location_match_type'] ?? null) === 'radius' && (int) ($values['required_location_radius_km'] ?? 0) < 1) {

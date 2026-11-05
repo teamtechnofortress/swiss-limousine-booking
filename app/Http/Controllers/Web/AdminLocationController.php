@@ -46,6 +46,42 @@ final class AdminLocationController extends Controller
         return response()->json(['data' => $this->maps->locationPredictions($data['q'])]);
     }
 
+    /** Lightweight catalogue search for admin location pickers. */
+    public function searchSaved(Request $request): JsonResponse
+    {
+        abort_unless(
+            $request->user()?->can('locations.manage')
+            || $request->user()?->can('trips.manage')
+            || $request->user()?->can('service_area.manage'),
+            403,
+        );
+
+        $data = $request->validate(['q' => ['required', 'string', 'min:2', 'max:100']]);
+        $term = '%'.addcslashes(trim($data['q']), '%_\\').'%';
+
+        $locations = Location::query()
+            ->active()
+            ->where(function ($query) use ($term): void {
+                $query->where('name', 'like', $term)
+                    ->orWhere('formatted_address', 'like', $term)
+                    ->orWhere('locality', 'like', $term)
+                    ->orWhere('admin_area_name', 'like', $term)
+                    ->orWhere('country_code', 'like', $term);
+            })
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->limit(10)
+            ->get(['id', 'name', 'formatted_address', 'locality', 'country_code']);
+
+        return response()->json(['data' => $locations->map(fn (Location $location): array => [
+            'id' => $location->id,
+            'name' => $location->name,
+            'address' => $location->formatted_address,
+            'locality' => $location->locality,
+            'country_code' => $location->country_code,
+        ])->values()]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $data = $this->validatePayload($request, true);

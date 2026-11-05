@@ -44,7 +44,7 @@
             @endphp
             <div class="grid gap-4 p-5 md:grid-cols-[minmax(0,1fr)_minmax(260px,420px)] md:items-center @if($group === 'service_area' && $setting->key === 'required_location_radius_km') mx-5 mb-5 rounded-xl border border-amber-200 bg-amber-50/50 @endif" @if($group === 'service_area' && $setting->key === 'required_location_radius_km') data-required-location-radius-scope @endif>
                 <div>
-                    <label for="setting_{{ $setting->key }}" class="font-semibold text-slate-900">{{ str($setting->key)->replace('_', ' ')->title() }}</label>
+                    <label for="setting_{{ $setting->key }}" class="font-semibold text-slate-900">{{ $group === 'service_area' && $setting->key === 'required_location_id' ? 'Required location' : str($setting->key)->replace('_', ' ')->title() }}</label>
                     <p class="mt-1 max-w-xl text-sm leading-5 text-slate-500">{{ $setting->description }}</p>
                     @if($group === 'service_area' && $setting->key === 'required_location_radius_km')<p class="mt-2 text-xs font-bold uppercase tracking-wide text-amber-700">Level 3 · Only applies when Match Type is Radius</p>@endif
                     @if($group === 'service_area' && $setting->key === 'service_area_enforced')
@@ -87,6 +87,15 @@
                             <p data-site-logo-upload-error class="mt-2 hidden text-xs font-medium text-rose-600"></p>
                             <input data-site-logo-url id="setting_{{ $setting->key }}" class="admin-input mt-3" name="settings[{{ $setting->key }}]" value="{{ $current }}" placeholder="Or paste a public logo URL" @disabled(! $canEdit)>
                         </div>
+                    @elseif($group === 'service_area' && $setting->key === 'required_location_id')
+                        <x-admin.saved-location-picker
+                            id="setting_required_location_id"
+                            input-name="settings[required_location_id]"
+                            :selected="$requiredLocation ? [$requiredLocation] : []"
+                            placeholder="Search active saved locations"
+                            help="Only active locations can be selected. The location is used for city, region, or radius matching."
+                            :disabled="! $canEdit"
+                        />
                     @elseif($setting->type === 'bool')
                         <input type="hidden" name="settings[{{ $setting->key }}]" value="0">
                         <label class="flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 @if(! $canEdit) opacity-60 @endif">
