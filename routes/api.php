@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
+use App\Http\Controllers\Admin\EnquiryController as AdminEnquiryController;
 use App\Http\Controllers\Admin\MailSettingsController;
 use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
@@ -10,10 +11,11 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\VehicleCategoryController as AdminVehicleCategoryController;
 use App\Http\Controllers\Admin\VehicleController as AdminVehicleController;
 use App\Http\Controllers\Public\BookingController;
-use App\Http\Controllers\Public\PublicConfigController;
+use App\Http\Controllers\Public\EnquiryController;
 use App\Http\Controllers\Public\LocationChipController;
-use App\Http\Controllers\Public\TripController;
+use App\Http\Controllers\Public\PublicConfigController;
 use App\Http\Controllers\Public\QuoteController;
+use App\Http\Controllers\Public\TripController;
 use App\Http\Controllers\Public\VehicleController as PublicVehicleController;
 use App\Http\Controllers\Webhooks\StripeWebhookController;
 use Illuminate\Support\Facades\Route;
@@ -31,7 +33,8 @@ Route::prefix('public')->group(function (): void {
     Route::get('trips/{slug}/journey-config', [TripController::class, 'journeyConfig'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*');
     Route::get('trips/{slug}/availability', [TripController::class, 'availability'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')->middleware('throttle:quote-read');
     Route::post('trips/{slug}/quotes', [TripController::class, 'quote'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')->middleware('throttle:quotes');
-    Route::post('trips/{slug}/enquiries', [TripController::class, 'enquiry'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')->middleware('throttle:bookings');
+    // Compatibility endpoint for existing trip pages. It writes to the central enquiries table.
+    Route::post('trips/{slug}/enquiries', [EnquiryController::class, 'storeTrip'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')->middleware('throttle:bookings');
 
     Route::get('vehicles', [PublicVehicleController::class, 'index']);
     Route::get('vehicles/{slug}', [PublicVehicleController::class, 'show'])
@@ -39,6 +42,9 @@ Route::prefix('public')->group(function (): void {
 
     Route::post('quotes', [QuoteController::class, 'store'])
         ->middleware('throttle:quotes');
+
+    Route::post('enquiries', [EnquiryController::class, 'store'])
+        ->middleware('throttle:bookings');
 
     Route::get('quotes/{token}', [QuoteController::class, 'show'])
         ->where('token', '[a-f0-9]{64}')
@@ -125,6 +131,16 @@ Route::prefix('admin')->group(function (): void {
             Route::put('vehicles/{vehicle}/images/order', [AdminVehicleController::class, 'orderImages']);
             Route::delete('vehicles/{vehicle}/images/{mediaId}', [AdminVehicleController::class, 'destroyImage']);
         });
+
+        Route::get('enquiries', [AdminEnquiryController::class, 'index'])
+            ->middleware('can:enquiries.view');
+        // Declared before enquiries/{enquiry} so "new-count" is never treated as an ID.
+        Route::get('enquiries/new-count', [AdminEnquiryController::class, 'newCount'])
+            ->middleware('can:enquiries.view');
+        Route::get('enquiries/{enquiry}', [AdminEnquiryController::class, 'show'])
+            ->middleware('can:enquiries.view');
+        Route::patch('enquiries/{enquiry}', [AdminEnquiryController::class, 'update'])
+            ->middleware('can:enquiries.manage');
 
         // Booking and payment routes (from the booking core). Each one is guarded by its permission.
         // "new-count" is declared before {booking} so it is not read as an ID.

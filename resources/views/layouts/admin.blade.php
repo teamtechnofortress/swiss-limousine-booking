@@ -21,6 +21,7 @@
         <nav class="space-y-1 text-sm">
             <x-admin.nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')" icon="grid">Overview</x-admin.nav-link>
             @can('bookings.view')<x-admin.nav-link :href="route('admin.bookings.index')" :active="request()->routeIs('admin.bookings.*')" icon="calendar">Bookings</x-admin.nav-link>@endcan
+            @can('enquiries.view')<x-admin.nav-link :href="route('admin.enquiries.index')" :active="request()->routeIs('admin.enquiries.*')" icon="mail">Enquiries</x-admin.nav-link>@endcan
             @can('payments.view')<x-admin.nav-link :href="route('admin.payments.index')" :active="request()->routeIs('admin.payments.*')" icon="card">Payments</x-admin.nav-link>@endcan
             <p class="px-3 pt-7 pb-2 text-[10px] font-bold uppercase tracking-[.18em] text-slate-600">Configuration</p>
             @can('fleet.manage')<x-admin.nav-link :href="route('admin.vehicles.index')" :active="request()->routeIs('admin.vehicles.*')" icon="car">Vehicles</x-admin.nav-link>@endcan
@@ -46,6 +47,7 @@
                     <nav class="absolute left-0 z-20 mt-3 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
                         <a href="{{ route('admin.dashboard') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Overview</a>
                         @can('bookings.view')<a href="{{ route('admin.bookings.index') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Bookings</a>@endcan
+                        @can('enquiries.view')<a href="{{ route('admin.enquiries.index') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Enquiries</a>@endcan
                         @can('payments.view')<a href="{{ route('admin.payments.index') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Payments</a>@endcan
                         @can('fleet.manage')<a href="{{ route('admin.vehicles.index') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Vehicles</a>@endcan
                         @can('locations.manage')<a href="{{ route('admin.locations.index') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Locations</a>@endcan
@@ -57,7 +59,7 @@
                 </details>
                 <div><p class="text-xs font-semibold uppercase tracking-[.16em] text-slate-400">Swiss Limousine</p><h1 class="truncate text-lg font-bold text-slate-950">{{ $title ?? 'Overview' }}</h1></div>
             </div>
-            <div class="flex items-center gap-3"><span class="hidden rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 sm:block">{{ now('Europe/Zurich')->format('D, d M') }}</span><a href="{{ route('admin.bookings.index', ['unseen' => 1]) }}" class="grid size-9 place-items-center rounded-full bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 transition hover:text-slate-900">●</a></div>
+            <div class="flex items-center gap-3"><span class="hidden rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 sm:block">{{ now('Europe/Zurich')->format('D, d M') }}</span>@can('enquiries.view')<a href="{{ route('admin.enquiries.index', ['unread' => 1]) }}" title="Unread enquiries" class="grid size-9 place-items-center rounded-full bg-white text-amber-600 shadow-sm ring-1 ring-slate-200 transition hover:text-amber-700">●</a>@else @can('bookings.view')<a href="{{ route('admin.bookings.index', ['unseen' => 1]) }}" title="Unseen bookings" class="grid size-9 place-items-center rounded-full bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 transition hover:text-slate-900">●</a>@endcan @endcan</div>
         </header>
         <div class="admin-content mx-auto max-w-7xl px-5 py-7 lg:px-10">
             @if(session('status'))<div class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{{ session('status') }}</div>@endif

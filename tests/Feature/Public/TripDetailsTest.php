@@ -108,9 +108,9 @@ final class TripDetailsTest extends TestCase
             'message' => 'Please send me a proposal.',
         ])->assertCreated();
 
-        $this->assertDatabaseHas('trip_enquiries', [
+        $this->assertDatabaseHas('enquiries', [
             'trip_id' => $trip->id,
-            'email' => 'customer@example.test',
+            'customer_email' => 'customer@example.test',
         ]);
     }
 

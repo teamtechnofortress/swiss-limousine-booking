@@ -1,16 +1,17 @@
 <?php
 
+use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Web\AdminAuthController;
 use App\Http\Controllers\Web\AdminBookingController;
 use App\Http\Controllers\Web\AdminDashboardController;
-use App\Http\Controllers\Web\AdminVehicleController;
-use App\Http\Controllers\Web\AdminVehicleCategoryController;
-use App\Http\Controllers\Web\AdminPaymentController;
+use App\Http\Controllers\Web\AdminEnquiryController;
 use App\Http\Controllers\Web\AdminLocationController;
-use App\Http\Controllers\Web\AdminTripController;
+use App\Http\Controllers\Web\AdminPaymentController;
 use App\Http\Controllers\Web\AdminSettingsController;
+use App\Http\Controllers\Web\AdminTripController;
 use App\Http\Controllers\Web\AdminUserController;
-use App\Http\Controllers\Admin\MediaController as AdminMediaController;
+use App\Http\Controllers\Web\AdminVehicleCategoryController;
+use App\Http\Controllers\Web\AdminVehicleController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/admin');
@@ -32,6 +33,10 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::post('bookings/{booking}/waiting', [AdminBookingController::class, 'waiting'])->name('bookings.waiting')->middleware('can:bookings.waiting');
         Route::post('bookings/{booking}/cancel', [AdminBookingController::class, 'cancel'])->name('bookings.cancel')->middleware('can:bookings.cancel');
         Route::post('bookings/{booking}/mark-paid', [AdminBookingController::class, 'markPaid'])->name('bookings.mark-paid')->middleware('can:payments.mark_paid');
+
+        Route::get('enquiries', [AdminEnquiryController::class, 'index'])->name('enquiries.index')->middleware('can:enquiries.view');
+        Route::get('enquiries/{enquiry}', [AdminEnquiryController::class, 'show'])->name('enquiries.show')->middleware('can:enquiries.view');
+        Route::patch('enquiries/{enquiry}', [AdminEnquiryController::class, 'update'])->name('enquiries.update')->middleware('can:enquiries.manage');
 
         Route::get('payments', [AdminPaymentController::class, 'index'])->name('payments.index')->middleware('can:payments.view');
         Route::post('payments/{payment}/refund', [AdminPaymentController::class, 'refund'])->name('payments.refund')->middleware('can:payments.refund');

@@ -91,6 +91,11 @@ class Booking extends Model
         return $this->hasMany(BookingExtra::class);
     }
 
+    public function enquiries(): HasMany
+    {
+        return $this->hasMany(Enquiry::class);
+    }
+
     public function transitionTo(BookingStatus $next): void
     {
         if (! $this->status->canTransitionTo($next)) {

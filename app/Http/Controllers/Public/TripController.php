@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Models\Trip;
 use App\Models\Vehicle;
-use App\Models\TripEnquiry;
 use App\Services\Availability\AvailabilityService;
 use App\Services\Settings\SettingsService;
 use App\Services\Trips\TripSlotService;
@@ -112,15 +111,6 @@ final class TripController extends Controller
             $entries[] = ['date' => $date->toDateString(), 'departure_id' => $departure->id, 'start_time' => substr((string) $departure->start_time, 0, 5), ...$reason];
         }
         return response()->json(['data' => $entries]);
-    }
-
-    public function enquiry(string $slug, Request $request, SettingsService $settings): JsonResponse
-    {
-        abort_unless($settings->bool('trips_enabled'), 404);
-        $trip = Trip::query()->published()->where('slug', $slug)->firstOrFail();
-        $data = $request->validate(['name' => ['required','string','max:120'], 'email' => ['required','email','max:190'], 'phone' => ['required','string','max:30'], 'travel_date' => ['nullable','date'], 'travellers' => ['nullable','integer','min:1','max:99'], 'message' => ['required','string','max:3000']]);
-        TripEnquiry::query()->create([...$data, 'trip_id' => $trip->id]);
-        return response()->json(['data' => ['message' => 'Your trip enquiry has been received.']], 201);
     }
 
     public function quote(string $slug, StoreTripQuoteRequest $request, SettingsService $settings, TripQuoteService $quotes): JsonResponse

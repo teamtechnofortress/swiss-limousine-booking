@@ -29,7 +29,7 @@ class Trip extends Model implements HasMedia
     public function addons(): HasMany { return $this->hasMany(TripAddon::class)->orderBy('sort_order'); }
     public function prices(): HasMany { return $this->hasMany(TripPrice::class); }
     public function blackouts(): HasMany { return $this->hasMany(TripBlackoutDate::class); }
-    public function enquiries(): HasMany { return $this->hasMany(TripEnquiry::class); }
+    public function enquiries(): HasMany { return $this->hasMany(Enquiry::class); }
     public function bookings(): HasMany { return $this->hasMany(Booking::class); }
     public function tripLocations(): HasMany { return $this->hasMany(TripLocation::class)->orderBy('sort_order'); }
 

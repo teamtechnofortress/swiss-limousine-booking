@@ -62,6 +62,11 @@ class Vehicle extends Model implements HasMedia
         return $this->hasMany(Booking::class);
     }
 
+    public function enquiries(): HasMany
+    {
+        return $this->hasMany(Enquiry::class);
+    }
+
     /** Bookable online: active, priced, and either no slot check or at least one unit. */
     public function scopeBookable(Builder $query): Builder
     {

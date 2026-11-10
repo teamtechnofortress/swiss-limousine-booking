@@ -36,6 +36,10 @@ return [
             'bookings.cancel' => 'Cancel bookings',
             'bookings.waiting' => 'Record waiting time',
         ],
+        'enquiries' => [
+            'enquiries.view' => 'View customer enquiries',
+            'enquiries.manage' => 'Manage customer enquiries',
+        ],
         'payments' => [
             'payments.view' => 'View payments',
             'payments.mark_paid' => 'Mark offline payments as paid',
@@ -83,6 +87,7 @@ return [
                 'dashboard.view',
                 'bookings.view', 'bookings.edit', 'bookings.assign', 'bookings.create_manual',
                 'bookings.cancel', 'bookings.waiting', 'bookings.override_pickup',
+                'enquiries.view', 'enquiries.manage',
                 'payments.view', 'payments.mark_paid', 'payments.refund',
                 'fleet.manage', 'locations.manage', 'routes.manage', 'trips.manage', 'service_area.manage',
                 'payment_methods.manage', 'pricing.manage',
@@ -95,6 +100,7 @@ return [
             'permissions' => [
                 'dashboard.view',
                 'bookings.view', 'bookings.edit', 'bookings.assign', 'bookings.create_manual', 'bookings.waiting',
+                'enquiries.view', 'enquiries.manage',
             ],
         ],
         'finance' => [
@@ -109,7 +115,7 @@ return [
         'viewer' => [
             'label' => 'Viewer',
             'description' => 'Read-only access to bookings, payments and the dashboard.',
-            'permissions' => ['dashboard.view', 'bookings.view', 'payments.view'],
+            'permissions' => ['dashboard.view', 'bookings.view', 'payments.view', 'enquiries.view'],
         ],
     ],
 
