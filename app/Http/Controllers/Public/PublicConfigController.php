@@ -31,6 +31,13 @@ final class PublicConfigController extends Controller
             ],
             'google_browser_key' => $settings->string('google_browser_key'),
             'currency' => $settings->string('currency'),
+            // This is browser-safe configuration used to constrain the customer
+            // autocomplete UI. Quote and booking requests still enforce the same
+            // country list server-side.
+            'service_area' => [
+                'enforced' => $settings->bool('service_area_enforced'),
+                'allowed_countries' => $settings->list('allowed_countries'),
+            ],
             'turnstile_enabled' => $turnstileEnabled,
             // A Turnstile site key is public by design. Never expose turnstile_secret_key.
             'turnstile_site_key' => $turnstileEnabled ? $settings->string('turnstile_site_key') : '',
