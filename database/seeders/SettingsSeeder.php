@@ -67,7 +67,7 @@ final class SettingsSeeder extends Seeder
             'trip_min_notice_hours' => $this->def('trips', 'int', '48', 'Minimum notice before a customer can book a trip departure.', false, 'trips.manage'),
 
             // Availability
-            'default_slot_check_enabled' => $this->def('availability', 'bool', '1', 'Starting value of the slot check for new vehicles.', false, 'fleet.manage'),
+            'default_slot_check_enabled' => $this->def('availability', 'bool', '0', 'Starting value of the slot check for new vehicles.', false, 'fleet.manage'),
             'hold_ttl_minutes' => $this->def('availability', 'int', '31', 'Minutes an online booking holds its car while the customer pays. Minimum 31 (Stripe needs more than 30).', false, 'fleet.manage'),
             'default_buffer_minutes' => $this->def('availability', 'int', '60', 'Minutes reserved before pickup and after drop-off for reset and delays.', false, 'fleet.manage'),
 

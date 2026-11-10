@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\Booking;
+use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleCategory;
 use App\Services\Rbac\RbacSynchronizer;
@@ -25,9 +26,9 @@ final class VehicleManagementTest extends TestCase
         Sanctum::actingAs($this->manager());
     }
 
-    private function manager(): \App\Models\User
+    private function manager(): User
     {
-        $user = \App\Models\User::factory()->create(['is_active' => true]);
+        $user = User::factory()->create(['is_active' => true]);
         $user->assignRole('manager');
 
         return $user;
@@ -56,6 +57,16 @@ final class VehicleManagementTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.is_active', false)
             ->assertJsonPath('data.units.0.plate', 'ZH123456');
+    }
+
+    public function test_new_vehicles_disable_physical_slot_checks_by_default(): void
+    {
+        $payload = $this->payload();
+        unset($payload['slot_check_enabled']);
+
+        $this->postJson('/api/admin/vehicles', $payload)
+            ->assertCreated()
+            ->assertJsonPath('data.slot_check_enabled', false);
     }
 
     public function test_slot_checks_require_a_unit_before_publishing(): void

@@ -10,11 +10,11 @@ use App\Models\Vehicle;
 use App\Models\VehicleCategory;
 use App\Services\Settings\SettingsService;
 use App\Services\Vehicles\VehicleManager;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
 use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 final class AdminVehicleController extends Controller
@@ -31,7 +31,7 @@ final class AdminVehicleController extends Controller
             'status' => ['nullable', 'in:active,inactive'],
             'category_id' => ['nullable', 'integer', 'exists:vehicle_categories,id'],
         ]);
-        $vehicles = Vehicle::query()->with(['category.media', 'fleetUnits', 'media'])
+        $vehicles = Vehicle::query()->with(['category.media', 'media'])
             ->when($filters['q'] ?? null, function ($query, string $term): void {
                 $term = '%'.addcslashes($term, '%_\\').'%';
                 $query->where(fn ($search) => $search->where('name', 'like', $term)->orWhere('model_name', 'like', $term)->orWhere('slug', 'like', $term));
@@ -65,7 +65,7 @@ final class AdminVehicleController extends Controller
     {
         return view('admin.vehicles.edit', [
             ...$this->formData($vehicle),
-            'vehicle' => $vehicle->load(['fleetUnits', 'media']),
+            'vehicle' => $vehicle->load('media'),
             'hasBookings' => Booking::withTrashed()->where('vehicle_id', $vehicle->id)->exists(),
         ]);
     }
@@ -158,7 +158,9 @@ final class AdminVehicleController extends Controller
 
     private function mediaResponse(Vehicle $vehicle, Request $request, string $message): RedirectResponse|JsonResponse
     {
-        if (! $request->expectsJson()) return back()->with('status', $message);
+        if (! $request->expectsJson()) {
+            return back()->with('status', $message);
+        }
 
         return response()->json(['message' => $message, 'data' => [
             'images' => $vehicle->fresh('media')->getMedia('images')->sortBy('order_column')->values()->map(fn (Media $media) => $this->mediaItem($media))->all(),
@@ -191,7 +193,6 @@ final class AdminVehicleController extends Controller
                 )
                 ->orderBy('sort_order')->orderBy('name')->get(),
             'amenities' => Vehicle::AMENITIES,
-            'defaultSlotCheckEnabled' => $this->settings->bool('default_slot_check_enabled'),
             'vatIncluded' => $this->settings->bool('vat_included'),
         ];
     }

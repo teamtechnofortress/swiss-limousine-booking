@@ -1,9 +1,9 @@
 <x-layouts.admin title="Vehicles">
     <div class="mb-7 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
-            <p class="text-xs font-bold uppercase tracking-[.16em] text-indigo-600">Catalogue & availability</p>
+            <p class="text-xs font-bold uppercase tracking-[.16em] text-indigo-600">Vehicle catalogue</p>
             <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">Vehicles</h1>
-            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">A clear view of every customer-facing vehicle, its rate, publishing state and physical availability setup.</p>
+            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">A clear view of every customer-facing vehicle, its rate and publishing state.</p>
         </div>
         <div class="flex gap-2"><a href="{{ route('admin.vehicle-categories.index') }}" class="admin-button-soft">Manage categories</a><a href="{{ route('admin.vehicles.create') }}" class="admin-button">+ Add vehicle</a></div>
     </div>
@@ -26,15 +26,15 @@
             <form id="vehicle-reorder-form" method="POST" action="{{ route('admin.vehicles.reorder') }}" class="flex flex-col gap-3 border-b border-indigo-100 bg-indigo-50/60 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">@csrf @method('PUT')<p class="text-sm text-indigo-800"><span class="font-bold">Website order:</span> drag a row by its handle, then save.</p><button class="admin-button-soft">Save display order</button></form>
         @endif
 
-        <div class="hidden grid-cols-[32px_minmax(280px,1.5fr)_minmax(130px,.7fr)_minmax(150px,.8fr)_130px_96px] gap-5 border-b border-slate-100 bg-slate-50 px-5 py-3 text-[11px] font-bold uppercase tracking-[.12em] text-slate-400 xl:grid">
-            <span></span><span>Vehicle</span><span>Online rate</span><span>Availability</span><span>Status</span><span>Manage</span>
+        <div class="hidden grid-cols-[32px_minmax(280px,1.5fr)_minmax(130px,.7fr)_130px_96px] gap-5 border-b border-slate-100 bg-slate-50 px-5 py-3 text-[11px] font-bold uppercase tracking-[.12em] text-slate-400 xl:grid">
+            <span></span><span>Vehicle</span><span>Online rate</span><span>Status</span><span>Manage</span>
         </div>
 
         <div id="vehicle-list" class="divide-y divide-slate-100">
             @forelse($vehicles as $vehicle)
                 @php($primaryImage = $vehicle->media->where('collection_name', 'images')->sortBy('order_column')->first())
                 @php($primaryImagePath = $primaryImage?->hasGeneratedConversion('thumbnail') ? $primaryImage->getPathRelativeToRoot('thumbnail') : $primaryImage?->getPathRelativeToRoot())
-                <article class="grid gap-4 px-5 py-5 xl:grid-cols-[32px_minmax(280px,1.5fr)_minmax(130px,.7fr)_minmax(150px,.8fr)_130px_96px] xl:items-center" @if($canReorder) draggable="true" data-vehicle-row @endif>
+                <article class="grid gap-4 px-5 py-5 xl:grid-cols-[32px_minmax(280px,1.5fr)_minmax(130px,.7fr)_130px_96px] xl:items-center" @if($canReorder) draggable="true" data-vehicle-row @endif>
                     @if($canReorder)<input form="vehicle-reorder-form" type="hidden" name="vehicle_ids[]" value="{{ $vehicle->id }}">@endif
                     <div class="hidden cursor-grab text-xl text-slate-300 xl:block" aria-label="Drag to reorder">⠿</div>
                     <div class="flex min-w-0 gap-4">
@@ -42,7 +42,6 @@
                         <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><h2 class="truncate font-bold text-slate-900">{{ $vehicle->name }}</h2><span class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">{{ $vehicle->category->name }}</span></div><p class="mt-1 text-sm text-slate-500">{{ $vehicle->model_name ?: 'No model reference' }}</p><div class="mt-2 flex flex-wrap gap-1.5 text-xs font-semibold text-slate-500"><span class="rounded-md bg-slate-50 px-2 py-1">{{ $vehicle->passenger_capacity }} passengers</span><span class="rounded-md bg-slate-50 px-2 py-1">{{ $vehicle->luggage_capacity }} bags</span><span class="rounded-md bg-slate-50 px-2 py-1">{{ $vehicle->media->where('collection_name', 'images')->count() }} images</span></div></div>
                     </div>
                     <div><p class="text-sm font-bold text-slate-900">{{ $vehicle->price_per_km === null ? 'Price on request' : 'CHF '.number_format($vehicle->price_per_km / 100, 2).'/km' }}</p><p class="mt-1 text-xs text-slate-400">{{ $vehicle->minimum_fare === null ? 'No minimum fare' : 'Min. CHF '.number_format($vehicle->minimum_fare / 100, 2) }}</p></div>
-                    <div>@if($vehicle->slot_check_enabled)<p class="text-sm font-bold text-slate-800">{{ $vehicle->fleetUnits->count() }} physical {{ str('unit')->plural($vehicle->fleetUnits->count()) }}</p><p class="mt-1 text-xs text-emerald-700">Slot protection on</p>@else<p class="text-sm font-bold text-slate-800">No unit checks</p><p class="mt-1 text-xs text-amber-700">Double booking possible</p>@endif</div>
                     <div><span class="inline-flex items-center gap-1.5 text-sm font-bold {{ $vehicle->is_active ? 'text-emerald-700' : 'text-amber-700' }}"><span class="size-2 rounded-full {{ $vehicle->is_active ? 'bg-emerald-500' : 'bg-amber-500' }}"></span>{{ $vehicle->is_active ? 'Published' : 'Draft' }}</span><p class="mt-1 text-xs text-slate-400">Updated {{ $vehicle->updated_at->format('d M Y') }}</p></div>
                     <a href="{{ route('admin.vehicles.edit', $vehicle) }}" class="admin-button-soft text-center">Manage</a>
                 </article>

@@ -20,7 +20,7 @@ return new class extends Migration
             $table->unsignedInteger('price_per_km')->nullable();
             $table->unsignedInteger('minimum_fare')->nullable();
             $table->json('amenities')->nullable();
-            $table->boolean('slot_check_enabled')->default(true);
+            $table->boolean('slot_check_enabled')->default(false);
             $table->unsignedSmallInteger('sort_order')->default(0);
             $table->boolean('is_active')->default(false)->index();
             $table->timestamps();

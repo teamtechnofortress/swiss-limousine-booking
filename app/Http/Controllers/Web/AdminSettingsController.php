@@ -6,13 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Location;
 use App\Models\Setting;
-use App\Services\Notifications\MailSettingsService;
 use App\Services\Geo\GoogleMapsClient;
+use App\Services\Notifications\MailSettingsService;
 use App\Services\Settings\SettingsService;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -65,13 +65,14 @@ final class AdminSettingsController extends Controller
                 'accessible' => $group === 'integrations'
                     ? $request->user()->can('integrations.view')
                     : Setting::query()->where('group', $group)->get()->contains(fn (Setting $setting) => $request->user()->can($setting->editable_by)),
-            ])->filter(fn (array $group) => $group['count'] > 0)->values(),
+            ])->filter(fn (array $group) => $group['key'] !== 'availability' && $group['count'] > 0)->values(),
         ]);
     }
 
     public function show(Request $request, string $group): View
     {
         $this->assertKnownGroup($group);
+        abort_if($group === 'availability', 404);
         if ($group === 'integrations') {
             abort_unless($request->user()->can('integrations.view'), 403);
         }
@@ -129,6 +130,7 @@ final class AdminSettingsController extends Controller
     public function update(Request $request, string $group): RedirectResponse
     {
         $this->assertKnownGroup($group);
+        abort_if($group === 'availability', 404);
         $records = $this->settingsForGroup($group);
         abort_if($records->isEmpty(), 404);
         abort_unless($records->every(fn (Setting $setting) => $request->user()->can($setting->editable_by)), 403);
