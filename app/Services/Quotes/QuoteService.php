@@ -7,6 +7,7 @@ use App\Data\QuoteSnapshot;
 use App\Data\RouteMetrics;
 use App\Enums\PaymentMethod;
 use App\Exceptions\BookingException;
+use App\Models\Vehicle;
 use App\Repositories\Contracts\VehicleRepositoryInterface;
 use App\Services\Availability\AvailabilityService;
 use App\Services\Geo\GoogleMapsClient;
@@ -98,6 +99,7 @@ final class QuoteService
                 'name' => $vehicle->name,
                 'slug' => $vehicle->slug,
                 'category' => $vehicle->category->name,
+                'thumbnail_url' => $this->thumbnailUrl($vehicle),
                 'price' => $price->toArray(),
                 'vat' => $split->toArray(),
             ];
@@ -187,5 +189,21 @@ final class QuoteService
         }
 
         return $methods;
+    }
+
+    private function thumbnailUrl(Vehicle $vehicle): ?string
+    {
+        $cover = $vehicle->media
+            ->where('collection_name', 'images')
+            ->sortBy('order_column')
+            ->first();
+
+        if ($cover === null) {
+            return null;
+        }
+
+        return $cover->hasGeneratedConversion('thumbnail')
+            ? $cover->getUrl('thumbnail')
+            : ($cover->hasGeneratedConversion('web') ? $cover->getUrl('web') : $cover->getUrl());
     }
 }

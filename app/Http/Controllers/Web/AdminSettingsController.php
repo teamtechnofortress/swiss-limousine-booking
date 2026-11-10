@@ -90,6 +90,17 @@ final class AdminSettingsController extends Controller
             ];
             $settings = $settings->sortBy(fn (Setting $setting): int => $order[$setting->key] ?? 100)->values();
         }
+        if ($group === 'tax') {
+            $order = [
+                'currency' => 0,
+                'invoice_number_prefix' => 10,
+                'vat_enabled' => 20,
+                'vat_included' => 30,
+                'vat_rate_bp' => 40,
+                'vat_registration_number' => 50,
+            ];
+            $settings = $settings->sortBy(fn (Setting $setting): int => $order[$setting->key] ?? 100)->values();
+        }
         if ($group === 'company') {
             $order = ['site_name' => 0, 'site_logo_url' => 10];
             $settings = $settings->sortBy(fn (Setting $setting): int => $order[$setting->key] ?? 100)->values();

@@ -11,7 +11,7 @@
 /.phpunit.cache
 /.vscode
 /.zed
-/auth.json
+/auth.json.env
 /node_modules
 /public/hot
 /public/storage

@@ -155,6 +155,31 @@ document.querySelectorAll('[data-service-area-master]').forEach((master) => {
     sync();
 });
 
+document.querySelectorAll('[data-vat-master]').forEach((master) => {
+    const form = master.closest('form');
+    const scope = form.querySelector('[data-vat-scope]');
+    const notice = form.querySelector('[data-vat-disabled-notice]');
+    const status = form.querySelector('[data-vat-master-status]');
+    const summary = form.querySelector('[data-vat-master-summary]');
+
+    const sync = () => {
+        const enabled = master.checked;
+
+        status.textContent = enabled ? 'Enabled' : 'Disabled';
+        summary.textContent = enabled
+            ? 'VAT is calculated for every new quote and booking.'
+            : 'VAT is not calculated for new quotes or bookings.';
+
+        scope.inert = !enabled;
+        scope.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+        scope.classList.toggle('opacity-50', !enabled);
+        notice.classList.toggle('hidden', enabled);
+    };
+
+    master.addEventListener('change', sync);
+    sync();
+});
+
 document.querySelectorAll('[data-saved-location-picker]').forEach((picker) => {
     const search = picker.querySelector('[data-saved-location-search]');
     const results = picker.querySelector('[data-saved-location-results]');

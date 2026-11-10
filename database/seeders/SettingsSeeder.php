@@ -73,7 +73,7 @@ final class SettingsSeeder extends Seeder
 
             // Tax and currency
             'currency' => $this->def('tax', 'string', 'CHF', 'Currency for all prices, receipts and invoices.', false, 'tax.manage'),
-            'vat_enabled' => $this->def('tax', 'bool', '1', 'Turns VAT calculation on. Turn off only if the company is not VAT-registered.', false, 'tax.manage'),
+            'vat_enabled' => $this->def('tax', 'bool', '0', 'Turns VAT calculation on. Turn off only if the company is not VAT-registered.', false, 'tax.manage'),
             'vat_rate_bp' => $this->def('tax', 'int', '810', 'VAT rate in basis points. 810 = 8.10 percent.', false, 'tax.manage'),
             'vat_included' => $this->def('tax', 'bool', '1', 'When on, prices are entered and shown including VAT.', false, 'tax.manage'),
             'vat_registration_number' => $this->def('tax', 'string', '', 'Swiss VAT number printed on receipts (format CHE-xxx.xxx.xxx MWST).', false, 'tax.manage'),

@@ -33,6 +33,17 @@
                     </div>
                     <div class="divide-y divide-slate-100">
             @endif
+            @if($group === 'tax' && $setting->key === 'vat_included')
+                <section class="mx-5 mb-5 overflow-hidden rounded-2xl border border-blue-100 bg-blue-50/30 shadow-sm" data-vat-scope>
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-blue-100 bg-blue-50 px-5 py-3">
+                        <div><p class="text-sm font-bold text-slate-900">VAT configuration</p><p class="text-xs text-slate-500">Controlled by VAT Enabled</p></div>
+                        <span class="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-blue-700">Level 1</span>
+                    </div>
+                    <div class="m-5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600" data-vat-disabled-notice>
+                        VAT is disabled. These saved settings are retained, but VAT is not applied to new quotes or bookings.
+                    </div>
+                    <div class="divide-y divide-slate-100">
+            @endif
             @php
                 $current = old('settings.'.$setting->key, $setting->is_secret ? '' : ($values[$setting->key] ?? ''));
                 $selectOptions = match ($setting->key) {
@@ -49,6 +60,9 @@
                     @if($group === 'service_area' && $setting->key === 'required_location_radius_km')<p class="mt-2 text-xs font-bold uppercase tracking-wide text-amber-700">Level 3 · Only applies when Match Type is Radius</p>@endif
                     @if($group === 'service_area' && $setting->key === 'service_area_enforced')
                         <p class="mt-2 max-w-xl text-sm font-medium leading-5 text-slate-700" data-service-area-master-summary></p>
+                    @endif
+                    @if($group === 'tax' && $setting->key === 'vat_enabled')
+                        <p class="mt-2 max-w-xl text-sm font-medium leading-5 text-slate-700" data-vat-master-summary></p>
                     @endif
                     @if($setting->is_secret)<p class="mt-2 text-xs font-semibold text-amber-700">Stored encrypted. Leave blank to keep the current value.</p>@endif
                 </div>
@@ -99,8 +113,8 @@
                     @elseif($setting->type === 'bool')
                         <input type="hidden" name="settings[{{ $setting->key }}]" value="0">
                         <label class="flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 @if(! $canEdit) opacity-60 @endif">
-                            <span class="text-sm font-semibold text-slate-700" @if($group === 'service_area' && $setting->key === 'service_area_enforced') data-service-area-master-status @endif>{{ (bool) $current ? 'Enabled' : 'Disabled' }}</span>
-                            <input class="size-5 rounded border-slate-300 text-slate-950 focus:ring-slate-900" type="checkbox" name="settings[{{ $setting->key }}]" value="1" @checked((bool) $current) @disabled(! $canEdit) @if($group === 'service_area' && $setting->key === 'service_area_enforced') data-service-area-master @endif @if($group === 'service_area' && $setting->key === 'required_location_enabled') data-required-location-toggle @endif>
+                            <span class="text-sm font-semibold text-slate-700" @if($group === 'service_area' && $setting->key === 'service_area_enforced') data-service-area-master-status @endif @if($group === 'tax' && $setting->key === 'vat_enabled') data-vat-master-status @endif>{{ (bool) $current ? 'Enabled' : 'Disabled' }}</span>
+                            <input class="size-5 rounded border-slate-300 text-slate-950 focus:ring-slate-900" type="checkbox" name="settings[{{ $setting->key }}]" value="1" @checked((bool) $current) @disabled(! $canEdit) @if($group === 'service_area' && $setting->key === 'service_area_enforced') data-service-area-master @endif @if($group === 'service_area' && $setting->key === 'required_location_enabled') data-required-location-toggle @endif @if($group === 'tax' && $setting->key === 'vat_enabled') data-vat-master @endif>
                         </label>
                         @if($setting->key === 'vat_included')<p class="mt-2 text-xs font-semibold leading-5 text-amber-700">Warning: changing this does not recalculate existing vehicle rates. Their entered amounts will be interpreted in the newly selected VAT mode for all future quotes.</p>@endif
                     @elseif($setting->type === 'json')
@@ -116,6 +130,10 @@
             @if($group === 'service_area' && $setting->key === 'required_location_radius_km')
                     </div>
                 </section>
+                    </div>
+                </section>
+            @endif
+            @if($group === 'tax' && $setting->key === 'vat_registration_number')
                     </div>
                 </section>
             @endif
