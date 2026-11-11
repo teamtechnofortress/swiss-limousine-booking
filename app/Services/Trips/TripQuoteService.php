@@ -91,6 +91,12 @@ final class TripQuoteService
                 'name' => $vehicle->name,
                 'slug' => $vehicle->slug,
                 'category' => $vehicle->category->name,
+                'passenger_capacity' => $vehicle->passenger_capacity,
+                'luggage_capacity' => $vehicle->luggage_capacity,
+                'capacity' => [
+                    'passengers' => $vehicle->passenger_capacity,
+                    'luggage' => $vehicle->luggage_capacity,
+                ],
                 'vehicle' => $this->vehicleCard($vehicle),
                 'price' => [
                     'legs' => ['outbound' => $subtotal],

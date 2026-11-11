@@ -14,14 +14,29 @@ use App\Http\Resources\QuoteResource;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 final class TripController extends Controller
 {
     public function index(Request $request, SettingsService $settings): JsonResponse
     {
         abort_unless($settings->bool('trips_enabled'), 404);
-        $featured = $request->boolean('featured');
-        $trips = Trip::query()->published()
+
+        return response()->json(['data' => $this->listingCards($request->boolean('featured'))]);
+    }
+
+    /** A dedicated, cache-friendly endpoint for homepage and featured-trip sections. */
+    public function featured(SettingsService $settings): JsonResponse
+    {
+        abort_unless($settings->bool('trips_enabled'), 404);
+
+        return response()->json(['data' => $this->listingCards(featured: true)]);
+    }
+
+    /** @return Collection<int, array<string, mixed>> */
+    private function listingCards(bool $featured): Collection
+    {
+        return Trip::query()->published()
             ->when($featured, fn ($q) => $q->where('is_featured', true))
             ->with([
                 'media',
@@ -29,8 +44,9 @@ final class TripController extends Controller
                     ->whereHas('vehicle', fn ($vehicles) => $vehicles->where('is_active', true)->whereHas('category', fn ($categories) => $categories->where('is_active', true)))
                     ->whereHas('pickupLocation', fn ($locations) => $locations->where('is_active', true)->whereNull('locations.deleted_at')),
             ])
-            ->orderBy('sort_order')->orderBy('title')->get();
-        return response()->json(['data' => $trips->map(fn (Trip $trip) => $this->card($trip))->values()]);
+            ->orderBy('sort_order')->orderBy('title')->get()
+            ->map(fn (Trip $trip) => $this->card($trip))
+            ->values();
     }
 
     public function show(string $slug, SettingsService $settings): JsonResponse
@@ -274,6 +290,22 @@ final class TripController extends Controller
     /** @return array<string,mixed> */
     private function card(Trip $trip): array
     {
-        return ['slug' => $trip->slug, 'title' => $trip->title, 'subtitle' => $trip->subtitle, 'summary' => $trip->summary, 'description_html' => $trip->description, 'region' => $trip->region, 'pricing_mode' => $trip->pricing_mode, 'starting_from_price_minor' => $trip->pricing_mode === 'fixed' ? $trip->prices->min('price_minor') : null, 'cover_url' => $trip->getFirstMediaUrl('cover') ?: null];
+        $cover = $trip->getFirstMedia('cover');
+        $originalCoverUrl = $cover?->getUrl();
+
+        return [
+            'slug' => $trip->slug,
+            'title' => $trip->title,
+            'subtitle' => $trip->subtitle,
+            'summary' => $trip->summary,
+            'description_html' => $trip->description,
+            'region' => $trip->region,
+            'pricing_mode' => $trip->pricing_mode,
+            'starting_from_price_minor' => $trip->pricing_mode === 'fixed' ? $trip->prices->min('price_minor') : null,
+            // Kept for existing clients; this is the original, full-resolution upload.
+            'cover_url' => $originalCoverUrl,
+            'thumbnail_url' => $cover?->hasGeneratedConversion('thumbnail') ? $cover->getUrl('thumbnail') : $originalCoverUrl,
+            'original_cover_url' => $originalCoverUrl,
+        ];
     }
 }

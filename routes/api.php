@@ -28,6 +28,7 @@ Route::prefix('public')->group(function (): void {
     Route::get('config', PublicConfigController::class);
     Route::get('locations/chips', LocationChipController::class)->middleware('throttle:quote-read');
     Route::get('trips', [TripController::class, 'index']);
+    Route::get('trips/featured', [TripController::class, 'featured']);
     Route::get('trips/{slug}', [TripController::class, 'show'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*');
     Route::get('trips/{slug}/pickup-config', [TripController::class, 'pickupConfig'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*');
     Route::get('trips/{slug}/journey-config', [TripController::class, 'journeyConfig'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*');

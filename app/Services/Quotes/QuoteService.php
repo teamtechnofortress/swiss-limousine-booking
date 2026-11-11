@@ -100,6 +100,12 @@ final class QuoteService
                 'slug' => $vehicle->slug,
                 'category' => $vehicle->category->name,
                 'thumbnail_url' => $this->thumbnailUrl($vehicle),
+                'passenger_capacity' => $vehicle->passenger_capacity,
+                'luggage_capacity' => $vehicle->luggage_capacity,
+                'capacity' => [
+                    'passengers' => $vehicle->passenger_capacity,
+                    'luggage' => $vehicle->luggage_capacity,
+                ],
                 'price' => $price->toArray(),
                 'vat' => $split->toArray(),
             ];

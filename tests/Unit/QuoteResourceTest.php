@@ -33,6 +33,9 @@ final class QuoteResourceTest extends TestCase
                     'vehicle_id' => 7,
                     'name' => 'BMW 7 series',
                     'thumbnail_url' => 'https://example.test/media/bmw-7-series-thumb.webp',
+                    'passenger_capacity' => 3,
+                    'luggage_capacity' => 2,
+                    'capacity' => ['passengers' => 3, 'luggage' => 2],
                 ],
             ],
             paymentMethods: ['online'],
@@ -51,5 +54,8 @@ final class QuoteResourceTest extends TestCase
             'https://example.test/media/bmw-7-series-thumb.webp',
             $response['offers'][7]['thumbnail_url'],
         );
+        $this->assertSame(3, $response['offers'][7]['passenger_capacity']);
+        $this->assertSame(2, $response['offers'][7]['luggage_capacity']);
+        $this->assertSame(['passengers' => 3, 'luggage' => 2], $response['offers'][7]['capacity']);
     }
 }
