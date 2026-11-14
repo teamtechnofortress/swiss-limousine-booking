@@ -2,6 +2,7 @@
     $contentData = \App\Services\Trips\TripContentData::forTrip($trip);
     $savedCountries = $contentData['countries'] ?? [];
     $savedStops = $contentData['stops'] ?? [];
+    $heroImage = $contentData['hero_image_url'] ?? null;
     $hasContentOldInput = session()->hasOldInput('content_form');
     $countryRows = $hasContentOldInput ? old('countries', []) : array_column($savedCountries, 'name');
     $stopRows = $hasContentOldInput ? old('stops', []) : $savedStops;
@@ -16,6 +17,10 @@
     #trip-content-manager .dynamic-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }
     #trip-content-manager .dynamic-row input[type="text"] { flex: 1 1 180px; min-width: 0; }
     #trip-content-manager .dynamic-row input[type="file"] { flex: 1 1 220px; min-width: 0; }
+    #trip-content-manager .dynamic-row .country-logo-preview {
+        width: 48px !important; height: 48px !important; flex: 0 0 48px;
+        object-fit: contain; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; padding: 3px;
+    }
     #trip-content-manager input[type="text"],
     #trip-content-manager textarea,
     [data-trip-step="faqs"] input[type="text"],
@@ -61,6 +66,28 @@
 
         <div class="space-y-6 p-4 sm:p-6">
 
+            <div class="rounded-xl border border-slate-200 bg-slate-50/60 p-5">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <label class="admin-label">Hero Image</label>
+                    <p class="mt-1 text-xs text-slate-500">The main visual for this trip on the frontend. It is optimized to WebP at 1920 × 800 px when saved.</p>
+                    </div>
+                    @if($heroImage)
+                        <button type="button" id="remove-hero-image" class="remove-btn w-auto px-3" aria-label="Remove hero image">Remove image</button>
+                    @endif
+                </div>
+                <input type="hidden" name="remove_hero_image" id="remove-hero-image-input" value="0">
+                <div class="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                    <img id="hero-image-preview" src="{{ $heroImage ?: '' }}" alt="Current trip hero" class="aspect-[12/5] w-full object-cover {{ $heroImage ? '' : 'hidden' }}">
+                    <div id="hero-image-placeholder" class="grid aspect-[12/5] place-items-center px-4 text-center text-sm font-medium text-slate-400 {{ $heroImage ? 'hidden' : '' }}">No hero image selected</div>
+                </div>
+                <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <input type="file" id="hero-image-input" name="hero_image" accept="image/jpeg,image/png,image/webp" class="text-sm" data-hero-image-input>
+                    <p class="text-xs text-slate-500">JPEG, PNG, or WebP · Maximum 5 MB</p>
+                </div>
+                @error('hero_image')<p class="mt-2 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+            </div>
+
             <div>
                 <label class="admin-label mb-2">Tour Overview</label>
                 <textarea name="overview" rows="4" placeholder="Enter the trip overview here..." class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-slate-900/10">{{ old('overview', $contentData['overview'] ?? '') }}</textarea>
@@ -68,7 +95,7 @@
 
             <div class="rounded-xl border border-slate-200 bg-slate-50/60 p-5">
                 <div class="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-                    <label class="admin-label">Countries Covered</label>
+                    <div><label class="admin-label">Countries Covered</label><p class="mt-1 text-xs text-slate-500">Uploaded logos are converted to optimized WebP thumbnails (maximum 240 × 160 px).</p></div>
                     <button type="button" onclick="addCountry()" class="admin-button-soft shrink-0">+ Add Country</button>
                 </div>
                 <div id="countries-container" class="space-y-3">
@@ -77,11 +104,11 @@
                             $existingCountry = $hasContentOldInput ? old("country_existing.$countryIndex") : (isset($savedCountries[$countryIndex]) ? $countryIndex : null);
                             $countryLogo = $existingCountry !== null ? ($savedCountries[$existingCountry]['logo_url'] ?? null) : null;
                         @endphp
-                        <div class="dynamic-row">
+                        <div class="dynamic-row" data-image-upload>
                             @if($existingCountry !== null)<input type="hidden" name="country_existing[{{ $countryIndex }}]" value="{{ $existingCountry }}">@endif
                             <input type="text" name="countries[{{ $countryIndex }}]" value="{{ $countryName }}" placeholder="Country Name">
-                            @if($countryLogo)<img src="{{ $countryLogo }}" alt="{{ $countryName }} logo" class="h-10 w-14 rounded object-contain">@endif
-                            <input type="file" name="country_logos[{{ $countryIndex }}]" class="text-sm" accept="image/jpeg,image/png,image/webp">
+                            <img data-image-preview src="{{ $countryLogo ?: '' }}" alt="{{ $countryName }} logo preview" class="country-logo-preview {{ $countryLogo ? '' : 'hidden' }}">
+                            <input data-image-input type="file" name="country_logos[{{ $countryIndex }}]" class="text-sm" accept="image/jpeg,image/png,image/webp">
                             <button type="button" class="remove-btn" aria-label="Remove country" onclick="this.parentElement.remove()">X</button>
                         </div>
                     @endforeach
@@ -90,7 +117,7 @@
 
             <div class="rounded-xl border border-slate-200 bg-slate-50/60 p-5">
                 <div class="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-                    <label class="admin-label">The Incredible Stops</label>
+                    <div><label class="admin-label">The Incredible Stops</label><p class="mt-1 text-xs text-slate-500">Uploaded images are converted to optimized 960 × 640 px WebP thumbnails.</p></div>
                     <button type="button" onclick="addStop()" class="admin-button-soft shrink-0">+ Add Stop</button>
                 </div>
                 <div id="stops-container" class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -112,10 +139,11 @@
                                 <label class="admin-label mb-1">Country</label>
                                 <input type="text" name="stops[{{ $stopIndex }}][country]" value="{{ $stop['country'] ?? '' }}" placeholder="Country" class="w-full border p-2 rounded text-sm">
                             </div>
-                            <div>
+                            <div data-image-upload>
                                 <label class="admin-label mb-1">Stop Image</label>
-                                @if($stopImage)<img src="{{ $stopImage }}" alt="{{ $stop['city'] ?? 'Stop' }}" class="mb-2 h-20 w-32 rounded-lg object-cover"><p class="mb-2 text-xs text-slate-500">Current image is kept unless you choose a replacement.</p>@endif
-                                <input type="file" name="stops[{{ $stopIndex }}][image]" accept="image/jpeg,image/png,image/webp" class="text-sm w-full border border-slate-300 rounded p-1.5">
+                                <img data-image-preview src="{{ $stopImage ?: '' }}" alt="{{ $stop['city'] ?? 'Stop' }} preview" class="mb-2 h-20 w-32 rounded-lg border border-slate-200 object-cover {{ $stopImage ? '' : 'hidden' }}">
+                                @if($stopImage)<p class="mb-2 text-xs text-slate-500">Current image is kept unless you choose a replacement.</p>@endif
+                                <input data-image-input type="file" name="stops[{{ $stopIndex }}][image]" accept="image/jpeg,image/png,image/webp" class="text-sm w-full border border-slate-300 rounded p-1.5">
                             </div>
                         </div>
                     </div>
@@ -152,7 +180,6 @@
         </div>
     </form>
 
-    @include('admin.trips.partials.media-manager', ['trip' => $trip])
 </section>
 
 <script>
@@ -161,14 +188,59 @@
         const container = document.getElementById('countries-container');
         const div = document.createElement('div');
         div.className = 'dynamic-row';
+        div.setAttribute('data-image-upload', '');
         div.innerHTML = `<input type="text" name="countries[${countryCount}]" placeholder="Country Name">
-                         <input type="file" name="country_logos[${countryCount}]" accept="image/jpeg,image/png,image/webp" class="text-sm">
+                         <img data-image-preview alt="Country logo preview" class="country-logo-preview hidden">
+                         <input data-image-input type="file" name="country_logos[${countryCount}]" accept="image/jpeg,image/png,image/webp" class="text-sm">
                          <button type="button" class="remove-btn" onclick="this.parentElement.remove()">X</button>`;
         container.appendChild(div);
+        attachImagePreview(div);
         countryCount++;
     }
 
     let stopCount = {{ max(array_keys($stopRows)) + 1 }};
+
+    const heroImageInput = document.getElementById('hero-image-input');
+    const heroImagePreview = document.getElementById('hero-image-preview');
+    const heroImagePlaceholder = document.getElementById('hero-image-placeholder');
+    const removeHeroImageInput = document.getElementById('remove-hero-image-input');
+
+    heroImageInput?.addEventListener('change', event => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        heroImagePreview.src = url;
+        heroImagePreview.classList.remove('hidden');
+        heroImagePlaceholder.classList.add('hidden');
+        removeHeroImageInput.value = '0';
+    });
+
+    document.getElementById('remove-hero-image')?.addEventListener('click', () => {
+        heroImageInput.value = '';
+        heroImagePreview.removeAttribute('src');
+        heroImagePreview.classList.add('hidden');
+        heroImagePlaceholder.classList.remove('hidden');
+        removeHeroImageInput.value = '1';
+    });
+
+    function attachImagePreview(container) {
+        const input = container.querySelector('[data-image-input]');
+        const preview = container.querySelector('[data-image-preview]');
+        if (!input || !preview) return;
+
+        input.addEventListener('change', event => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            if (preview.dataset.previewUrl) URL.revokeObjectURL(preview.dataset.previewUrl);
+            const url = URL.createObjectURL(file);
+            preview.src = url;
+            preview.alt = `${file.name} preview`;
+            preview.dataset.previewUrl = url;
+            preview.classList.remove('hidden');
+        });
+    }
+
+    document.querySelectorAll('[data-image-upload]').forEach(attachImagePreview);
 
     function addStop() {
         const container = document.getElementById('stops-container');
@@ -189,14 +261,16 @@
                     <label class="admin-label mb-1">Country</label>
                     <input type="text" name="stops[${stopCount}][country]" placeholder="Country" class="w-full border p-2 rounded text-sm">
                 </div>
-                <div>
+                <div data-image-upload>
                     <label class="admin-label mb-1">Stop Image</label>
-                    <input type="file" name="stops[${stopCount}][image]" accept="image/jpeg,image/png,image/webp" class="text-sm w-full border border-slate-300 rounded p-1.5">
+                    <img data-image-preview alt="Stop image preview" class="mb-2 hidden h-20 w-32 rounded-lg border border-slate-200 object-cover">
+                    <input data-image-input type="file" name="stops[${stopCount}][image]" accept="image/jpeg,image/png,image/webp" class="text-sm w-full border border-slate-300 rounded p-1.5">
                 </div>
             </div>
         `;
 
         container.appendChild(div);
+        attachImagePreview(div);
         stopCount++;
     }
 </script>

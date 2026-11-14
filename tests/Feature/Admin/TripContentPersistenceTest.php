@@ -58,23 +58,30 @@ final class TripContentPersistenceTest extends TestCase
         ];
         $uploadFields = $fields;
         $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a/mkAAAAASUVORK5CYII=');
+        $uploadFields['hero_image'] = UploadedFile::fake()->createWithContent('hero.png', $png);
         $uploadFields['country_logos'][1] = UploadedFile::fake()->createWithContent('flag.png', $png);
         $uploadFields['stops'][1]['image'] = UploadedFile::fake()->createWithContent('stop.png', $png);
         $this->put(route('admin.trips.content', $trip), $uploadFields)->assertSessionHasNoErrors()->assertRedirect(route('admin.trips.edit', $trip).'#content');
         $data = $trip->fresh()->content_data;
         $this->assertSame($fields['overview'], $data['overview']);
         $this->assertSame($fields['itinerary'], $data['itinerary']);
+        $this->assertStringEndsWith('.webp', $data['hero_image_path']);
+        $this->assertStringEndsWith('.webp', $data['countries'][1]['logo_path']);
+        $this->assertStringEndsWith('.webp', $data['stops'][1]['image_path']);
+        Storage::disk('public')->assertExists($data['hero_image_path']);
         Storage::disk('public')->assertExists($data['countries'][1]['logo_path']);
         Storage::disk('public')->assertExists($data['stops'][1]['image_path']);
         $this->get(route('admin.trips.edit', $trip))->assertOk()
             ->assertSee('Explore the mountains.')->assertSee('value="Mercedes V-Class"', false)
-            ->assertSee('value="Innsbruck"', false)->assertSee($data['stops'][1]['image_url'], false);
+            ->assertSee('value="Innsbruck"', false)->assertSee($data['hero_image_url'], false)
+            ->assertSee($data['stops'][1]['image_url'], false);
 
         $fields['country_existing'] = [0, 1];
         $fields['stops'][0]['existing_index'] = 0;
         $fields['stops'][1]['existing_index'] = 1;
         $this->put(route('admin.trips.content', $trip), $fields)->assertSessionHasNoErrors();
         $this->assertSame($data, $trip->fresh()->content_data);
+        $this->assertStringContainsString($data['hero_image_url'], $trip->fresh()->description);
         $this->assertStringContainsString($data['stops'][1]['image_url'], $trip->fresh()->description);
 
         // Removing the first row must keep the second row's image attached correctly.

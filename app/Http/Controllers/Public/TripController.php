@@ -9,6 +9,7 @@ use App\Services\Availability\AvailabilityService;
 use App\Services\Settings\SettingsService;
 use App\Services\Trips\TripSlotService;
 use App\Services\Trips\TripQuoteService;
+use App\Services\Trips\TripContentData;
 use App\Http\Requests\Public\StoreTripQuoteRequest;
 use App\Http\Resources\QuoteResource;
 use Carbon\CarbonImmutable;
@@ -54,6 +55,7 @@ final class TripController extends Controller
         abort_unless($settings->bool('trips_enabled'), 404);
         $trip = Trip::query()->published()->where('slug', $slug)->with('media')->firstOrFail();
         $booking = $this->bookingConfiguration($trip, $settings);
+        $content = TripContentData::forTrip($trip);
 
         return response()->json(['data' => [
             'slug' => $trip->slug,
@@ -61,6 +63,7 @@ final class TripController extends Controller
             'subtitle' => $trip->subtitle,
             'summary' => $trip->summary,
             'description_html' => $trip->description,
+            'hero_image_url' => $content['hero_image_url'] ?? null,
             'faqs' => $trip->faqs,
             'region' => $trip->region,
             'cover_url' => $trip->getFirstMediaUrl('cover') ?: null,
@@ -300,6 +303,7 @@ final class TripController extends Controller
             'subtitle' => $trip->subtitle,
             'summary' => $trip->summary,
             'description_html' => $trip->description,
+            'hero_image_url' => TripContentData::forTrip($trip)['hero_image_url'] ?? null,
             'region' => $trip->region,
             'pricing_mode' => $trip->pricing_mode,
             'starting_from_price_minor' => $trip->pricing_mode === 'fixed' ? $trip->prices->min('price_minor') : null,

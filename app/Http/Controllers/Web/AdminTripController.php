@@ -14,8 +14,13 @@ use App\Services\Trips\TripContentData;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use RuntimeException;
+use Spatie\Image\Enums\Fit;
+use Spatie\Image\Image;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Illuminate\Validation\ValidationException;
 
@@ -43,6 +48,8 @@ final class AdminTripController extends Controller
     // 1. Validate the simple inputs
     $request->validate([
         'overview' => ['nullable', 'string', 'max:5000'],
+        'hero_image' => ['nullable', 'image', 'mimes:jpeg,png,webp', 'max:5120'],
+        'remove_hero_image' => ['nullable', 'boolean'],
         'countries' => ['nullable', 'array'],
         'countries.*' => ['nullable', 'string', 'max:100'],
         'country_logos' => ['nullable', 'array'],
@@ -63,6 +70,17 @@ final class AdminTripController extends Controller
 
     $saved = TripContentData::forTrip($trip);
     $overview = (string) $request->input('overview', '');
+    $previousHeroPath = $saved['hero_image_path'] ?? null;
+    $heroImagePath = $previousHeroPath;
+    $heroImageUrl = $saved['hero_image_url'] ?? null;
+
+    if ($request->hasFile('hero_image')) {
+        $heroImagePath = $this->storeOptimizedImage($request->file('hero_image'), 'trip-content/hero', 1920, 800, Fit::Crop);
+        $heroImageUrl = asset('storage/'.$heroImagePath);
+    } elseif ($request->boolean('remove_hero_image')) {
+        $heroImagePath = null;
+        $heroImageUrl = null;
+    }
     $countries = [];
     foreach ($request->input('countries', []) ?? [] as $index => $name) {
         if (trim((string) $name) === '') continue;
@@ -70,7 +88,7 @@ final class AdminTripController extends Controller
         $country = $existing !== null ? ($saved['countries'][$existing] ?? []) : [];
         $country['name'] = trim($name);
         if ($request->hasFile("country_logos.$index")) {
-            $country['logo_path'] = $request->file("country_logos.$index")->store('trip-content/countries', 'public');
+            $country['logo_path'] = $this->storeOptimizedImage($request->file("country_logos.$index"), 'trip-content/countries', 240, 160, Fit::Max);
             $country['logo_url'] = asset('storage/'.$country['logo_path']);
         }
         $countries[] = $country;
@@ -83,7 +101,7 @@ final class AdminTripController extends Controller
         $savedStop['city'] = trim($stop['city']);
         $savedStop['country'] = trim((string) ($stop['country'] ?? ''));
         if ($request->hasFile("stops.$index.image")) {
-            $savedStop['image_path'] = $request->file("stops.$index.image")->store('stops', 'public');
+            $savedStop['image_path'] = $this->storeOptimizedImage($request->file("stops.$index.image"), 'trip-content/stops', 960, 640, Fit::Crop);
             $savedStop['image_url'] = asset('storage/'.$savedStop['image_path']);
         }
         $stops[] = $savedStop;
@@ -95,6 +113,13 @@ final class AdminTripController extends Controller
 
     // 2. Build the HTML String
     $html = '';
+
+    // --- Hero image ---
+    if ($heroImageUrl) {
+        $html .= '<section class="tour-hero-image-section">';
+        $html .= '<img src="' . e($heroImageUrl) . '" alt="' . e($trip->title) . '" class="tour-hero-image">';
+        $html .= '</section>';
+    }
 
     // --- Overview ---
     if ($overview) {
@@ -219,14 +244,49 @@ final class AdminTripController extends Controller
     $trip->update([
         'description' => $html,
         'content_data' => [
-            'overview' => $overview, 'countries' => $countries, 'stops' => $stops,
+            'overview' => $overview, 'hero_image_path' => $heroImagePath, 'hero_image_url' => $heroImageUrl,
+            'countries' => $countries, 'stops' => $stops,
             'itinerary' => $itineraryRaw, 'comfort_car' => $comfortCar,
             'included_items' => $includedItems, 'not_included_items' => $notIncludedItems,
         ],
     ]);
 
+    if (
+        is_string($previousHeroPath)
+        && $previousHeroPath !== $heroImagePath
+        && str_starts_with($previousHeroPath, 'trip-content/hero/')
+    ) {
+        Storage::disk('public')->delete($previousHeroPath);
+    }
+
     return $this->stepRedirect($trip, $request)->with('status', 'Trip content generated and saved successfully!');
 }
+
+    /** Store a WebP web thumbnail while keeping the original upload out of public storage. */
+    private function storeOptimizedImage(UploadedFile $file, string $directory, int $width, int $height, Fit $fit): string
+    {
+        $temporaryPath = tempnam(sys_get_temp_dir(), 'trip-image-');
+        $path = $directory.'/'.Str::uuid().'.webp';
+
+        if ($temporaryPath === false) {
+            throw new RuntimeException('Unable to create a temporary image file.');
+        }
+
+        try {
+            Image::load($file->getRealPath())
+                ->orientation()
+                ->fit($fit, $width, $height)
+                ->format('webp')
+                ->quality(85)
+                ->save($temporaryPath);
+
+            Storage::disk('public')->put($path, file_get_contents($temporaryPath));
+
+            return $path;
+        } finally {
+            @unlink($temporaryPath);
+        }
+    }
 
 
     public function faqs(Trip $trip, Request $request): RedirectResponse

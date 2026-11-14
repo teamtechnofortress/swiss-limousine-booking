@@ -34,6 +34,8 @@ final class TripContentData
 
         $data = [
             'overview' => $text('section-text', $nodes('tour-overview-section')->item(0)),
+            'hero_image_path' => null,
+            'hero_image_url' => $xpath->query('.//img/@src', $nodes('tour-hero-image-section')->item(0))->item(0)?->nodeValue,
             'countries' => [], 'stops' => [], 'itinerary' => '',
             'comfort_car' => $text('comfort-car'),
             'included_items' => '', 'not_included_items' => '',

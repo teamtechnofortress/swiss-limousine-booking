@@ -3,7 +3,7 @@
     $gallery = $trip->getMedia('gallery')->sortBy('order_column')->values();
 @endphp
 
-<details id="trip-media-manager" data-trip-step="content" data-trip-media data-cover-upload-url="{{ route('admin.trips.cover', $trip) }}" data-gallery-upload-url="{{ route('admin.trips.gallery', $trip) }}" data-order-url="{{ route('admin.trips.gallery.order', $trip) }}" data-delete-url-template="{{ route('admin.trips.gallery.destroy', [$trip, '__MEDIA_ID__']) }}" class="admin-card overflow-hidden">
+<details id="trip-media-manager" data-trip-media data-cover-upload-url="{{ route('admin.trips.cover', $trip) }}" data-gallery-upload-url="{{ route('admin.trips.gallery', $trip) }}" data-order-url="{{ route('admin.trips.gallery.order', $trip) }}" data-delete-url-template="{{ route('admin.trips.gallery.destroy', [$trip, '__MEDIA_ID__']) }}" class="admin-card overflow-hidden">
     <summary class="cursor-pointer border-b border-slate-100 px-6 py-5 font-bold text-slate-900">Media &amp; gallery</summary>
     <div class="space-y-7 p-6">
         <section class="rounded-2xl border border-slate-200 p-4 sm:p-5">
