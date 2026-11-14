@@ -153,27 +153,34 @@ final class AdminTripController extends Controller
         $html .= '</div></section>';
     }
 
-    // --- Itinerary ---
+       // --- Itinerary ---
     if ($itineraryRaw) {
         $html .= '<section class="tour-itinerary-section">';
         $html .= '<h2 class="section-title">Your Tour Itinerary</h2>';
         $html .= '<ul class="itinerary-timeline">';
 
-        $lines = explode("\n", $itineraryRaw);
-        foreach ($lines as $line) {
-            if (trim($line) == '') continue;
-            $parts = explode('|', $line);
+        // Split the text into blocks based on empty lines
+        $blocks = preg_split('/\n\s*\n/', trim($itineraryRaw));
+
+        foreach ($blocks as $block) {
+            $block = trim($block);
+            if ($block === '') continue;
+
+            // Split the block by the pipe symbol (|)
+            $parts = explode('|', $block, 2);
             $title = trim($parts[0]);
             $desc = isset($parts[1]) ? trim($parts[1]) : '';
 
             $html .= '<li class="itinerary-item">';
             $html .= '<strong class="itinerary-time">' . e($title) . '</strong>';
-            if ($desc) $html .= '<p class="itinerary-desc">' . e($desc) . '</p>';
+            if ($desc) {
+                $html .= '<p class="itinerary-desc">' . e($desc) . '</p>';
+            }
             $html .= '</li>';
         }
         $html .= '</ul></section>';
     }
-
+    
     // --- Comfort ---
     if ($comfortCar) {
         $html .= '<section class="tour-comfort-section">';

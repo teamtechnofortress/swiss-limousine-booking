@@ -61,6 +61,7 @@ final class TripController extends Controller
             'subtitle' => $trip->subtitle,
             'summary' => $trip->summary,
             'description_html' => $trip->description,
+            'faqs' => $trip->faqs,
             'region' => $trip->region,
             'cover_url' => $trip->getFirstMediaUrl('cover') ?: null,
             'gallery' => $trip->getMedia('gallery')->map(fn ($media) => ['id' => $media->id, 'url' => $media->getUrl()])->values(),
