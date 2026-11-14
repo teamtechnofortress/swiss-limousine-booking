@@ -7,12 +7,12 @@ use App\Models\User;
 use App\Services\Rbac\RbacSynchronizer;
 use App\Services\Trips\TripContentData;
 use Database\Seeders\SettingsSeeder;
+use Illuminate\Database\Events\MigrationStarted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Database\Events\MigrationStarted;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 final class TripContentPersistenceTest extends TestCase
@@ -65,6 +65,7 @@ final class TripContentPersistenceTest extends TestCase
         $data = $trip->fresh()->content_data;
         $this->assertSame($fields['overview'], $data['overview']);
         $this->assertSame($fields['itinerary'], $data['itinerary']);
+        $this->assertStringContainsString('The 2 Incredible Stops', $trip->fresh()->description);
         $this->assertStringEndsWith('.webp', $data['hero_image_path']);
         $this->assertStringEndsWith('.webp', $data['countries'][1]['logo_path']);
         $this->assertStringEndsWith('.webp', $data['stops'][1]['image_path']);

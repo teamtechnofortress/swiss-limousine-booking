@@ -13,6 +13,7 @@ final class DatabaseSeeder extends Seeder
             AdminSeeder::class,
             SettingsSeeder::class,
             VehicleSeeder::class,
+            TripSeeder::class,
         ]);
     }
 }

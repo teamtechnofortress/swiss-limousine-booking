@@ -159,7 +159,9 @@ final class AdminTripController extends Controller
     // --- Stops ---
     if (!empty($stops)) {
         $html .= '<section class="tour-stops-section">';
-        $html .= '<h2 class="section-title">The 6 Incredible Stops</h2>';
+        $stopCount = count($stops);
+        $stopLabel = $stopCount === 1 ? 'The 1 Incredible Stop' : "The {$stopCount} Incredible Stops";
+        $html .= '<h2 class="section-title">' . e($stopLabel) . '</h2>';
         $html .= '<div class="stops-grid">';
 
         foreach ($stops as $index => $stop) {
