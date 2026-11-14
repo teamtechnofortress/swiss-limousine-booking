@@ -62,6 +62,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
             Route::patch('trips/{trip}', [AdminTripController::class, 'update'])->name('trips.update');
             Route::put('trips/{trip}/departures', [AdminTripController::class, 'departures'])->name('trips.departures');
             Route::put('trips/{trip}/content', [AdminTripController::class, 'content'])->name('trips.content');
+            Route::put('trips/{trip}/faqs', [AdminTripController::class, 'faqs'])->name('trips.faqs');
             Route::put('trips/{trip}/items', fn () => abort(410))->name('trips.items');
             Route::put('trips/{trip}/addons', [AdminTripController::class, 'addons'])->name('trips.addons');
             Route::put('trips/{trip}/prices', [AdminTripController::class, 'prices'])->name('trips.prices');

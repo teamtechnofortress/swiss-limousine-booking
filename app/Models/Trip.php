@@ -18,12 +18,12 @@ class Trip extends Model implements HasMedia
     protected $fillable = [
         'slug', 'title', 'subtitle', 'summary', 'description', 'region', 'status',
         'pricing_mode', 'fixed_departures_only', 'meeting_point_required', 'pickup_locations_only', 'min_travellers', 'max_travellers', 'traveller_limits_enabled', 'is_featured', 'sort_order', 'meta_title',
-        'meta_description', 'published_at',
+        'meta_description', 'published_at', 'content_data',
     ];
 
     protected function casts(): array
     {
-        return ['is_featured' => 'boolean', 'fixed_departures_only' => 'boolean', 'meeting_point_required' => 'boolean', 'pickup_locations_only' => 'boolean', 'traveller_limits_enabled' => 'boolean', 'published_at' => 'datetime'];
+        return ['content_data' => 'array', 'is_featured' => 'boolean', 'fixed_departures_only' => 'boolean', 'meeting_point_required' => 'boolean', 'pickup_locations_only' => 'boolean', 'traveller_limits_enabled' => 'boolean', 'published_at' => 'datetime'];
     }
 
     public function departures(): HasMany { return $this->hasMany(TripDeparture::class)->orderBy('sort_order'); }
@@ -51,4 +51,9 @@ class Trip extends Model implements HasMedia
             ->format('webp')
             ->nonQueued();
     }
+
+    public function faqs(){
+    return $this->hasMany(TripFaq::class)->orderBy('sort_order');
+}
+
 }

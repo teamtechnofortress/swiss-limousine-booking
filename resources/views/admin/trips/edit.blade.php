@@ -1,7 +1,7 @@
 <x-layouts.admin :title="$trip->title">
     <div class="mb-7 flex flex-col justify-between gap-4 xl:flex-row xl:items-end"><div><a href="{{ route('admin.trips.index') }}" class="text-sm font-bold text-indigo-700">← Trips</a><p class="mt-5 text-xs font-bold uppercase tracking-[.16em] text-indigo-600">Trip editor</p><h1 class="mt-1 text-2xl font-bold text-slate-950">{{ $trip->title }}</h1><p class="mt-2 text-sm text-slate-500">A tour only becomes public after every required item below is ready.</p></div><form method="POST" action="{{ route('admin.trips.status',$trip) }}" class="flex gap-2">@csrf @method('PUT')@if($trip->status !== 'published')<button name="action" value="publish" class="admin-button">Publish trip</button>@else<button name="action" value="unpublish" class="admin-button-soft">Unpublish</button>@endif<button name="action" value="archive" class="admin-button-soft">Archive</button></form></div>
     <nav class="mb-5 flex flex-wrap gap-2" aria-label="Trip editor steps">
-        @foreach(['overview' => '1. Overview', 'locations' => '2. Locations', 'content' => '3. Content', 'departures' => '4. Duration & departures', 'pricing' => '5. Pricing', 'publish' => '6. Publish'] as $step => $label)
+        @foreach(['overview' => '1. Overview', 'locations' => '2. Locations', 'content' => '3. Content','faqs' => '4. FAQs', 'departures' => '5. Duration & departures', 'pricing' => '6. Pricing', 'publish' => '7. Publish'] as $step => $label)
             <button type="button" data-trip-tab="{{ $step }}" class="rounded-lg border border-indigo-100 bg-white px-3 py-2 text-sm font-bold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-700">{{ $label }}</button>
         @endforeach
     </nav>
@@ -15,6 +15,56 @@
         <details data-trip-step="overview" class="admin-card overflow-hidden"><summary class="cursor-pointer border-b border-slate-100 px-6 py-5 font-bold text-slate-900">Media</summary><div class="p-6"><form method="POST" enctype="multipart/form-data" action="{{ route('admin.trips.cover',$trip) }}" class="flex flex-col gap-4 sm:flex-row sm:items-end">@csrf<div><label class="admin-label">Cover image (required before publishing)</label><input type="file" required accept="image/jpeg,image/png,image/webp" name="cover" class="block text-sm"></div><button class="admin-button-soft">Upload cover</button></form>@if($trip->hasMedia('cover'))<p class="mt-3 text-sm font-semibold text-emerald-700">A cover image is present.</p>@endif<div class="mt-6 border-t border-slate-100 pt-6"><form method="POST" enctype="multipart/form-data" action="{{ route('admin.trips.gallery',$trip) }}" class="flex flex-col gap-4 sm:flex-row sm:items-end">@csrf<div><label class="admin-label">Gallery images</label><input type="file" required multiple accept="image/jpeg,image/png,image/webp" name="images[]" class="block text-sm"><p class="mt-1 text-xs text-slate-500">Upload up to 20 images at a time. They appear on the trip page gallery.</p></div><button class="admin-button-soft">Upload gallery</button></form><div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">@forelse($trip->getMedia('gallery') as $media)<div class="relative overflow-hidden rounded-lg border border-slate-200"><img class="aspect-[4/3] w-full object-cover" src="{{ $media->getUrl() }}" alt=""><form method="POST" action="{{ route('admin.trips.gallery.destroy',[$trip,$media->id]) }}" class="absolute right-2 top-2">@csrf @method('DELETE')<button class="rounded bg-white/95 px-2 py-1 text-xs font-bold text-rose-700 shadow">Remove</button></form></div>@empty<p class="col-span-full text-sm text-slate-500">No gallery images yet.</p>@endforelse</div></div></div></details>
         <details data-trip-step="departures" class="admin-card overflow-hidden"><summary class="cursor-pointer border-b border-slate-100 px-6 py-5 font-bold text-slate-900">Departures</summary><form method="POST" action="{{ route('admin.trips.departures',$trip) }}" class="p-6">@csrf @method('PUT')<p class="mb-4 text-sm text-slate-500">Times are Europe/Zurich local time. Keep only the departures this tour actually offers.</p><div id="departures" class="space-y-3">@forelse($trip->departures as $i=>$row)<div class="grid gap-3 sm:grid-cols-[1fr_auto]"><input class="admin-input !mt-0" required type="time" name="departures[{{ $i }}][start_time]" value="{{ substr($row->start_time,0,5) }}"><label class="flex items-center gap-2 text-sm font-semibold"><input type="hidden" name="departures[{{ $i }}][is_active]" value="0"><input type="checkbox" name="departures[{{ $i }}][is_active]" value="1" @checked($row->is_active)> Active</label></div>@empty<div class="grid gap-3 sm:grid-cols-[1fr_auto]"><input class="admin-input !mt-0" required type="time" name="departures[0][start_time]"><label class="flex items-center gap-2 text-sm font-semibold"><input type="hidden" name="departures[0][is_active]" value="0"><input type="checkbox" name="departures[0][is_active]" value="1" checked> Active</label></div>@endforelse</div><button class="mt-4 text-sm font-bold text-indigo-700" type="button" onclick="addDeparture()">+ Add departure</button><button class="admin-button ml-4">Save departures</button></form></details>
         <details data-trip-step="content" class="admin-card overflow-hidden"><summary class="cursor-pointer border-b border-slate-100 px-6 py-5 font-bold text-slate-900">Content</summary><form method="POST" action="{{ route('admin.trips.items',$trip) }}" class="p-6">@csrf @method('PUT')<p class="mb-4 text-sm text-slate-500">At least one highlight is required for publication.</p><div id="items" class="space-y-4">@forelse($trip->items as $i=>$item)<div class="grid gap-3 rounded-xl border border-slate-100 p-4 md:grid-cols-2"><select class="admin-input !mt-0" name="items[{{ $i }}][kind]"><option value="highlight" @selected($item->kind==='highlight')>Highlight</option><option value="itinerary" @selected($item->kind==='itinerary')>Itinerary</option><option value="included" @selected($item->kind==='included')>Included</option><option value="excluded" @selected($item->kind==='excluded')>Excluded</option></select><input class="admin-input !mt-0" name="items[{{ $i }}][time_label]" value="{{ $item->time_label }}" placeholder="Time label (itinerary only)"><input class="admin-input !mt-0 md:col-span-2" required name="items[{{ $i }}][title]" value="{{ $item->title }}" placeholder="Title"><textarea class="admin-input !mt-0 md:col-span-2" name="items[{{ $i }}][description]" placeholder="Description">{{ $item->description }}</textarea></div>@empty<div class="grid gap-3 rounded-xl border border-slate-100 p-4 md:grid-cols-2"><select class="admin-input !mt-0" name="items[0][kind]"><option value="highlight">Highlight</option><option value="itinerary">Itinerary</option><option value="included">Included</option><option value="excluded">Excluded</option></select><input class="admin-input !mt-0" name="items[0][time_label]" placeholder="Time label"><input class="admin-input !mt-0 md:col-span-2" required name="items[0][title]" placeholder="Title"><textarea class="admin-input !mt-0 md:col-span-2" name="items[0][description]" placeholder="Description"></textarea></div>@endforelse</div><button class="admin-button mt-4">Save content</button></form></details>
+        <details data-trip-step="faqs" class="admin-card overflow-hidden">
+            <summary class="cursor-pointer border-b border-slate-100 px-6 py-5 font-bold text-slate-900">FAQs</summary>
+            <div class="p-6">
+                <div class="mb-5 flex flex-col items-start justify-between gap-3 border-b border-slate-100 pb-5 sm:flex-row sm:items-center">
+                    <div>
+                        <label class="block text-lg font-bold text-slate-900">Frequently Asked Questions</label>
+                        <p class="mt-1 text-sm text-slate-500">Add questions and answers that will appear on the trip page.</p>
+                    </div>
+                    <button type="button" onclick="addFaq()" class="admin-button-soft shrink-0">+ Add FAQ</button>
+                </div>
+
+                <form method="POST" action="{{ route('admin.trips.faqs', $trip) }}" id="faq-form">
+                    @csrf
+                    @method('PUT')
+                    <div id="faqs-container" class="space-y-4">
+                        @forelse($trip->faqs as $index => $faq)
+                        <div class="bg-white p-4 rounded-lg border border-slate-200 relative shadow-sm">
+                            <button type="button" class="remove-btn absolute top-2 right-2" onclick="this.parentElement.remove()">X</button>
+                            <input type="hidden" name="faqs[{{ $index }}][id]" value="{{ $faq->id }}">
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="admin-label mb-1">Question</label>
+                                    <input type="text" name="faqs[{{ $index }}][question]" value="{{ $faq->question }}" placeholder="Enter question" class="w-full border p-2 rounded text-sm" required>
+                                </div>
+                                <div>
+                                    <label class="admin-label mb-1">Answer</label>
+                                    <textarea name="faqs[{{ $index }}][answer]" rows="2" placeholder="Enter answer" class="w-full border p-2 rounded text-sm" required>{{ $faq->answer }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+                        @empty
+                        <div class="bg-white p-4 rounded-lg border border-slate-200 relative shadow-sm">
+                            <button type="button" class="remove-btn absolute top-2 right-2" onclick="this.parentElement.remove()">X</button>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="admin-label mb-1">Question</label>
+                                    <input type="text" name="faqs[0][question]" placeholder="Enter question" class="w-full border p-2 rounded text-sm" required>
+                                </div>
+                                <div>
+                                    <label class="admin-label mb-1">Answer</label>
+                                    <textarea name="faqs[0][answer]" rows="2" placeholder="Enter answer" class="w-full border p-2 rounded text-sm" required></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        @endforelse
+                    </div>
+                    <div class="mt-5 flex justify-end border-t border-slate-100 pt-5"><button class="admin-button">Save FAQs</button></div>
+                </form>
+            </div>
+        </details>
         <details data-trip-step="pricing" class="admin-card overflow-hidden"><summary class="cursor-pointer border-b border-slate-100 px-6 py-5 font-bold text-slate-900">Pricing</summary><form method="POST" action="{{ route('admin.trips.prices',$trip) }}" class="p-6">@csrf @method('PUT')@if($trip->pricing_mode === 'enquiry')<div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><strong>Enquiry-only pricing is enabled.</strong> Switch the pricing mode to “Fixed vehicle prices” in Overview to offer online prices.</div>@else<p class="mb-4 text-sm text-slate-500">Set one fixed price for each vehicle this trip can use. A vehicle can be added only once. Prices are in rappen: CHF 425 is <strong>42500</strong>.</p><div id="trip-prices" class="space-y-3">@forelse($trip->prices as $i=>$price)<div class="grid gap-3 rounded-xl border border-slate-100 p-3 md:grid-cols-[1.6fr_1fr_auto]"><select class="admin-input !mt-0" name="prices[{{ $i }}][vehicle_id]">@foreach($vehicles as $vehicle)<option value="{{ $vehicle->id }}" @selected($price->vehicle_id===$vehicle->id)>{{ $vehicle->name }}</option>@endforeach</select><input class="admin-input !mt-0" type="number" min="0" name="prices[{{ $i }}][price_minor]" value="{{ $price->price_minor }}" placeholder="Price rappen"><label class="flex items-center gap-2 text-xs font-bold"><input type="hidden" name="prices[{{ $i }}][is_active]" value="0"><input type="checkbox" name="prices[{{ $i }}][is_active]" value="1" @checked($price->is_active)> Active</label></div>@empty<div class="grid gap-3 rounded-xl border border-slate-100 p-3 md:grid-cols-[1.6fr_1fr_auto]"><select class="admin-input !mt-0" name="prices[0][vehicle_id]">@foreach($vehicles as $vehicle)<option value="{{ $vehicle->id }}">{{ $vehicle->name }}</option>@endforeach</select><input class="admin-input !mt-0" type="number" min="0" name="prices[0][price_minor]" placeholder="Price rappen"><label class="flex items-center gap-2 text-xs font-bold"><input type="hidden" name="prices[0][is_active]" value="0"><input type="checkbox" name="prices[0][is_active]" value="1" checked> Active</label></div>@endforelse</div><button id="add-trip-price" class="mt-4 text-sm font-bold text-indigo-700" type="button" onclick="addTripPrice()">+ Add another vehicle</button><button class="admin-button ml-4">Save vehicle prices</button><template id="trip-price-template"><div class="grid gap-3 rounded-xl border border-slate-100 p-3 md:grid-cols-[1.6fr_1fr_auto]"><select class="admin-input !mt-0" data-price-name="vehicle_id">@foreach($vehicles as $vehicle)<option value="{{ $vehicle->id }}">{{ $vehicle->name }}</option>@endforeach</select><input class="admin-input !mt-0" type="number" min="0" data-price-name="price_minor" placeholder="Price rappen"><label class="flex items-center gap-2 text-xs font-bold"><input type="hidden" data-price-name="is_active" value="0"><input type="checkbox" data-price-name="is_active" value="1" checked> Active</label></div></template>@endif</form></details>
         <details data-trip-step="availability" class="admin-card overflow-hidden"><summary class="cursor-pointer border-b border-slate-100 px-6 py-5 font-bold text-slate-900">Add-ons and blackout dates</summary><div class="grid gap-6 p-6 lg:grid-cols-2"><form method="POST" action="{{ route('admin.trips.addons',$trip) }}">@csrf @method('PUT')<h3 class="font-bold">Add-ons</h3><div class="mt-3 space-y-3">@forelse($trip->addons as $i=>$addon)<div class="grid gap-2"><input class="admin-input !mt-0" required name="addons[{{ $i }}][name]" value="{{ $addon->name }}"><input class="admin-input !mt-0" required type="number" min="0" name="addons[{{ $i }}][price_minor]" value="{{ $addon->price_minor }}" placeholder="Price rappen"><input class="admin-input !mt-0" required type="number" min="1" max="20" name="addons[{{ $i }}][max_quantity]" value="{{ $addon->max_quantity }}" placeholder="Maximum quantity"><textarea class="admin-input !mt-0" name="addons[{{ $i }}][description]">{{ $addon->description }}</textarea></div>@empty<div class="grid gap-2"><input class="admin-input !mt-0" required name="addons[0][name]" placeholder="Name"><input class="admin-input !mt-0" required type="number" min="0" name="addons[0][price_minor]" placeholder="Price rappen"><input class="admin-input !mt-0" required type="number" min="1" name="addons[0][max_quantity]" value="1"></div>@endforelse</div><button class="admin-button mt-4">Save add-ons</button></form><form method="POST" action="{{ route('admin.trips.blackouts',$trip) }}">@csrf @method('PUT')<h3 class="font-bold">Blackout dates</h3><div class="mt-3 space-y-3">@forelse($trip->blackouts as $i=>$blackout)<div class="grid gap-2"><input class="admin-input !mt-0" required type="date" name="blackouts[{{ $i }}][date]" value="{{ $blackout->date->toDateString() }}"><input class="admin-input !mt-0" name="blackouts[{{ $i }}][reason]" value="{{ $blackout->reason }}" placeholder="Internal reason"></div>@empty<div class="grid gap-2"><input class="admin-input !mt-0" required type="date" name="blackouts[0][date]"><input class="admin-input !mt-0" name="blackouts[0][reason]" placeholder="Internal reason"></div>@endforelse</div><button class="admin-button mt-4">Save blackouts</button></form></div></details>
         <section data-trip-step="locations" class="admin-card overflow-hidden">
@@ -100,5 +150,26 @@
             document.querySelectorAll('form[action*="/admin/trips/"]').forEach(form=>form.addEventListener('submit',()=>{let stepInput=form.querySelector('input[name="editor_step"]');if(!stepInput){stepInput=document.createElement('input');stepInput.type='hidden';stepInput.name='editor_step';form.append(stepInput);}stepInput.value=location.hash.slice(1)||new URLSearchParams(location.search).get('step')||'overview';}));
             tabs.forEach(tab=>tab.addEventListener('click',()=>show(tab.dataset.tripTab)));pickupToggle?.addEventListener('change',syncPickups);syncPickups();syncTripPrices();setupTripContentEditor();setupTripMedia();show(location.hash.slice(1)||new URLSearchParams(location.search).get('step')||'overview');
         })();
+
+        function addFaq() {
+    const container = document.getElementById('faqs-container');
+    const index = container.children.length;
+    const div = document.createElement('div');
+    div.className = 'bg-white p-4 rounded-lg border border-slate-200 relative shadow-sm';
+    div.innerHTML = `
+        <button type="button" class="remove-btn absolute top-2 right-2" onclick="this.parentElement.remove()">X</button>
+        <div class="space-y-3">
+            <div>
+                <label class="admin-label mb-1">Question</label>
+                <input type="text" name="faqs[${index}][question]" placeholder="Enter question" class="w-full border p-2 rounded text-sm" required>
+            </div>
+            <div>
+                <label class="admin-label mb-1">Answer</label>
+                <textarea name="faqs[${index}][answer]" rows="2" placeholder="Enter answer" class="w-full border p-2 rounded text-sm" required></textarea>
+            </div>
+        </div>
+    `;
+    container.appendChild(div);
+}
     </script>
 </x-layouts.admin>

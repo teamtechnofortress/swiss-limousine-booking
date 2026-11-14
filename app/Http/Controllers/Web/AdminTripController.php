@@ -10,6 +10,7 @@ use App\Models\Vehicle;
 use App\Services\Geo\GoogleMapsClient;
 use App\Services\Pricing\PricingService;
 use App\Services\Trips\TripManager;
+use App\Services\Trips\TripContentData;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,13 +38,214 @@ final class AdminTripController extends Controller
     public function edit(Trip $trip): View { return view('admin.trips.edit', ['trip' => $trip->load(['departures', 'items', 'addons', 'prices.vehicle', 'blackouts', 'tripLocations.location', 'media']), 'vehicles' => Vehicle::query()->with('category')->orderBy('name')->get(), 'checklist' => $this->trips->checklist($trip)]); }
     public function update(Trip $trip, Request $request): RedirectResponse { $this->trips->update($trip, $this->overview($request)); return $this->stepRedirect($trip, $request)->with('status', 'Trip overview saved.'); }
     public function departures(Trip $trip, Request $request): RedirectResponse { $request->validate(['fixed_departures_only' => ['required','boolean']]); $fixedOnly = $request->boolean('fixed_departures_only'); $trip->update(['fixed_departures_only' => $fixedOnly]); if ($fixedOnly) $this->trips->replaceDepartures($trip, $this->rows($request, 'departures', ['start_time' => ['required','date_format:H:i'], 'is_active' => ['nullable','boolean']])); return $this->stepRedirect($trip, $request)->with('status', $fixedOnly ? 'Fixed departure times saved.' : 'Customers can now choose a custom departure time.'); }
-    public function content(Trip $trip, Request $request): RedirectResponse
-    {
-        $data = $request->validate(['description' => ['nullable', 'string', 'max:50000']]);
-        $trip->update(['description' => $this->sanitizeDescription($data['description'] ?? null)]);
+   public function content(Trip $trip, Request $request): RedirectResponse
+{
+    // 1. Validate the simple inputs
+    $request->validate([
+        'overview' => ['nullable', 'string', 'max:5000'],
+        'countries' => ['nullable', 'array'],
+        'countries.*' => ['nullable', 'string', 'max:100'],
+        'country_logos' => ['nullable', 'array'],
+        'country_logos.*' => ['nullable', 'image', 'mimes:jpeg,png,webp', 'max:5120'],
+        'country_existing' => ['nullable', 'array'],
+        'country_existing.*' => ['nullable', 'integer', 'min:0'],
+        'stops' => ['nullable', 'array'],
+        'stops.*' => ['array'],
+        'stops.*.city' => ['nullable', 'string', 'max:255'],
+        'stops.*.country' => ['nullable', 'string', 'max:100'],
+        'stops.*.image' => ['nullable', 'image', 'mimes:jpeg,png,webp', 'max:5120'],
+        'stops.*.existing_index' => ['nullable', 'integer', 'min:0'],
+        'itinerary' => ['nullable', 'string'],
+        'comfort_car' => ['nullable', 'string', 'max:255'],
+        'included_items' => ['nullable', 'string'],
+        'not_included_items' => ['nullable', 'string'],
+    ]);
 
-        return $this->stepRedirect($trip, $request)->with('status', 'Trip content saved.');
+    $saved = TripContentData::forTrip($trip);
+    $overview = (string) $request->input('overview', '');
+    $countries = [];
+    foreach ($request->input('countries', []) ?? [] as $index => $name) {
+        if (trim((string) $name) === '') continue;
+        $existing = $request->input("country_existing.$index");
+        $country = $existing !== null ? ($saved['countries'][$existing] ?? []) : [];
+        $country['name'] = trim($name);
+        if ($request->hasFile("country_logos.$index")) {
+            $country['logo_path'] = $request->file("country_logos.$index")->store('trip-content/countries', 'public');
+            $country['logo_url'] = asset('storage/'.$country['logo_path']);
+        }
+        $countries[] = $country;
     }
+    $stops = [];
+    foreach ($request->input('stops', []) ?? [] as $index => $stop) {
+        if (trim((string) ($stop['city'] ?? '')) === '') continue;
+        $existing = $stop['existing_index'] ?? null;
+        $savedStop = $existing !== null ? ($saved['stops'][$existing] ?? []) : [];
+        $savedStop['city'] = trim($stop['city']);
+        $savedStop['country'] = trim((string) ($stop['country'] ?? ''));
+        if ($request->hasFile("stops.$index.image")) {
+            $savedStop['image_path'] = $request->file("stops.$index.image")->store('stops', 'public');
+            $savedStop['image_url'] = asset('storage/'.$savedStop['image_path']);
+        }
+        $stops[] = $savedStop;
+    }
+    $itineraryRaw = (string) $request->input('itinerary', '');
+    $comfortCar = (string) $request->input('comfort_car', '');
+    $includedItems = (string) $request->input('included_items', '');
+    $notIncludedItems = (string) $request->input('not_included_items', '');
+
+    // 2. Build the HTML String
+    $html = '';
+
+    // --- Overview ---
+    if ($overview) {
+        $html .= '<section class="tour-overview-section">';
+        $html .= '<h2 class="section-title">Tour Overview</h2>';
+        $html .= '<p class="section-text">' . e($overview) . '</p>';
+        $html .= '</section>';
+    }
+
+    // --- Countries ---
+    if (!empty($countries)) {
+        $html .= '<section class="tour-countries-section">';
+        $html .= '<h2 class="section-title">Countries Covered</h2>';
+        $html .= '<ul class="country-flags-list">';
+
+        $flagCodes = [
+            'Switzerland' => 'ch',
+            'Germany' => 'de',
+            'Austria' => 'at',
+            'Liechtenstein' => 'li'
+        ];
+
+        foreach ($countries as $countryData) {
+            $country = $countryData['name'];
+            if (empty($country)) continue;
+
+            $code = $flagCodes[$country] ?? strtolower(substr($country, 0, 2));
+            $html .= '<li class="country-pill">';
+            $logoUrl = $countryData['logo_url'] ?? 'https://flagcdn.com/w20/' . $code . '.png';
+            $html .= '<img src="' . e($logoUrl) . '" alt="' . e($country) . ' Flag" class="flag-icon">';
+            $html .= '<span>' . e($country) . '</span>';
+            $html .= '</li>';
+        }
+        $html .= '</ul></section>';
+    }
+
+    // --- Stops ---
+    if (!empty($stops)) {
+        $html .= '<section class="tour-stops-section">';
+        $html .= '<h2 class="section-title">The 6 Incredible Stops</h2>';
+        $html .= '<div class="stops-grid">';
+
+        foreach ($stops as $index => $stop) {
+            if (empty($stop['city'])) continue;
+
+            $num = str_pad($index + 1, 2, '0', STR_PAD_LEFT);
+            $imgUrl = $stop['image_url'] ?? '[INSERT_IMAGE_URL]';
+
+            $html .= '<article class="stop-card">';
+            $html .= '<span class="stop-number">' . $num . '</span>';
+            $html .= '<img src="' . e($imgUrl) . '" alt="' . e($stop['city']) . '" class="stop-image">';
+            $html .= '<h4 class="stop-city">' . e($stop['city']) . '</h4>';
+            $html .= '<p class="stop-country">' . e($stop['country'] ?? '') . '</p>';
+            $html .= '</article>';
+        }
+        $html .= '</div></section>';
+    }
+
+    // --- Itinerary ---
+    if ($itineraryRaw) {
+        $html .= '<section class="tour-itinerary-section">';
+        $html .= '<h2 class="section-title">Your Tour Itinerary</h2>';
+        $html .= '<ul class="itinerary-timeline">';
+
+        $lines = explode("\n", $itineraryRaw);
+        foreach ($lines as $line) {
+            if (trim($line) == '') continue;
+            $parts = explode('|', $line);
+            $title = trim($parts[0]);
+            $desc = isset($parts[1]) ? trim($parts[1]) : '';
+
+            $html .= '<li class="itinerary-item">';
+            $html .= '<strong class="itinerary-time">' . e($title) . '</strong>';
+            if ($desc) $html .= '<p class="itinerary-desc">' . e($desc) . '</p>';
+            $html .= '</li>';
+        }
+        $html .= '</ul></section>';
+    }
+
+    // --- Comfort ---
+    if ($comfortCar) {
+        $html .= '<section class="tour-comfort-section">';
+        $html .= '<h2 class="section-title">Your Travel Comfort</h2>';
+        $html .= '<h3 class="comfort-car">' . e($comfortCar) . '</h3>';
+        $html .= '<ul class="comfort-features">';
+        $html .= '<li>Up to 7 Passengers</li><li>Spacious &amp; Luxurious Interior</li>';
+        $html .= '<li>Climate Control</li><li>Professional Chauffeur</li>';
+        $html .= '</ul></section>';
+    }
+
+    // --- Included / Not Included ---
+    if ($includedItems || $notIncludedItems) {
+        $html .= '<section class="tour-inclusions-section">';
+
+        if ($includedItems) {
+            $html .= '<article class="included-list"><h4 class="included-title">What\'s Included</h4><ul>';
+            foreach (explode("\n", $includedItems) as $item) {
+                if (trim($item)) $html .= '<li>' . e(trim($item)) . '</li>';
+            }
+            $html .= '</ul></article>';
+        }
+
+        if ($notIncludedItems) {
+            $html .= '<article class="not-included-list"><h4 class="not-included-title">Not Included</h4><ul>';
+            foreach (explode("\n", $notIncludedItems) as $item) {
+                if (trim($item)) $html .= '<li>' . e(trim($item)) . '</li>';
+            }
+            $html .= '</ul></article>';
+        }
+
+        $html .= '</section>';
+    }
+
+    // 3. Save the generated HTML to the description column
+    $trip->update([
+        'description' => $html,
+        'content_data' => [
+            'overview' => $overview, 'countries' => $countries, 'stops' => $stops,
+            'itinerary' => $itineraryRaw, 'comfort_car' => $comfortCar,
+            'included_items' => $includedItems, 'not_included_items' => $notIncludedItems,
+        ],
+    ]);
+
+    return $this->stepRedirect($trip, $request)->with('status', 'Trip content generated and saved successfully!');
+}
+
+
+    public function faqs(Trip $trip, Request $request): RedirectResponse
+    {
+        $request->validate([
+            'faqs' => ['nullable', 'array'],
+            'faqs.*.question' => ['required_with:faqs', 'string', 'max:1000'],
+            'faqs.*.answer' => ['required_with:faqs', 'string', 'max:5000'],
+        ]);
+
+        $trip->faqs()->delete();
+
+        foreach ($request->faqs ?? [] as $index => $faqData) {
+            $trip->faqs()->create([
+                'question' => $faqData['question'],
+                'answer' => $faqData['answer'],
+                'sort_order' => $index,
+                'is_active' => true,
+            ]);
+        }
+
+        return $this->stepRedirect($trip, $request)->with('status', 'FAQs saved successfully.');
+    }
+
+
+
     public function addons(Trip $trip, Request $request): RedirectResponse { if ($trip->pricing_mode === 'enquiry') return $this->stepRedirect($trip, $request)->withErrors(['addons' => 'Add-ons can be offered only for fixed or route-based pricing.']); $this->trips->replaceAddons($trip, $this->rows($request, 'addons', ['name' => ['required','string','max:160'], 'description' => ['nullable','string','max:1000'], 'price_minor' => ['required','integer','min:0'], 'max_quantity' => ['required','integer','min:1','max:20'], 'is_active' => ['nullable','boolean']])); return $this->stepRedirect($trip, $request)->with('status', 'Add-ons saved.'); }
     public function prices(Trip $trip, Request $request): RedirectResponse { try { $this->trips->replacePrices($trip, $this->rows($request, 'prices', ['vehicle_id' => ['required','integer','exists:vehicles,id'], 'price_minor' => ['required','integer','min:0'], 'is_active' => ['nullable','boolean']])); } catch (RuntimeException $e) { return $this->stepRedirect($trip, $request)->withErrors(['prices' => $e->getMessage()]); } return $this->stepRedirect($trip, $request)->with('status', 'Vehicle prices saved.'); }
     public function pricing(Trip $trip, Request $request): RedirectResponse
