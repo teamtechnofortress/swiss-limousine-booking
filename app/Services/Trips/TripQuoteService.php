@@ -59,11 +59,15 @@ final class TripQuoteService
         $this->serviceArea->assertAllowed($pickup, $pickup);
         $window = $this->slots->window($departure, $date, $durationMinutes, $customDepartureTime);
         if ($window['start']->lt(CarbonImmutable::now('UTC')->addHours($this->settings->int('trip_min_notice_hours')))) throw new BookingException('trip_too_soon', 'This departure is inside the minimum booking notice period.');
-        $destination = $trip->tripLocations->firstWhere('role', TripLocation::MAIN_DESTINATION)?->location;
-        if ($destination === null || ! $destination->google_place_id) throw new BookingException('trip_destination_missing', 'This trip has no primary destination configured.', 422);
-        $route = $this->maps->computeRoute($pickup->placeId, $destination->google_place_id);
-        $travelDistanceM = $route->distanceM * 2;
-        $travelDurationS = $route->durationS * 2;
+        $travelDistanceM = 0;
+        $travelDurationS = 0;
+        if ($trip->pricing_mode === 'distance') {
+            $destination = $trip->tripLocations->firstWhere('role', TripLocation::MAIN_DESTINATION)?->location;
+            if ($destination === null || ! $destination->google_place_id) throw new BookingException('trip_destination_missing', 'This trip has no primary destination configured.', 422);
+            $route = $this->maps->computeRoute($pickup->placeId, $destination->google_place_id);
+            $travelDistanceM = $route->distanceM * 2;
+            $travelDurationS = $route->durationS * 2;
+        }
         $availabilityWindow = $this->availability->occupiedWindow($window['start'], $durationMinutes * 60 + $travelDurationS);
 
         $offers = [];
@@ -73,7 +77,9 @@ final class TripQuoteService
         foreach ($candidates as $candidate) {
             $vehicle = $candidate['vehicle']; $fixedPrice = $candidate['fixed_price'];
             if ($vehicle === null || ($fixedPrice !== null && ! $fixedPrice->is_active) || ! $vehicle->is_active || ! $vehicle->category?->is_active || $vehicle->passenger_capacity < $travellers || ! $this->availability->hasFreeUnit($vehicle, $availabilityWindow['from'], $availabilityWindow['to'])) continue;
-            $base = $fixedPrice?->price_minor ?? $this->pricing->price($vehicle, $route, true, 0)->subtotal;
+            $base = $fixedPrice !== null
+                ? $fixedPrice->price_minor
+                : $this->pricing->price($vehicle, $route, true, 0)->subtotal;
             $subtotal = $base; $split = $this->vat->split($subtotal);
             $offers[$vehicle->id] = [
                 'vehicle_id' => $vehicle->id,
