@@ -10,6 +10,7 @@ use App\Services\Settings\SettingsService;
 use App\Services\Trips\TripSlotService;
 use App\Services\Trips\TripQuoteService;
 use App\Services\Trips\TripContentData;
+use App\Services\Trips\TripBookingConfiguration;
 use App\Http\Requests\Public\StoreTripQuoteRequest;
 use App\Http\Resources\QuoteResource;
 use Carbon\CarbonImmutable;
@@ -19,6 +20,8 @@ use Illuminate\Support\Collection;
 
 final class TripController extends Controller
 {
+    public function __construct(private readonly TripBookingConfiguration $bookingConfiguration) {}
+
     public function index(Request $request, SettingsService $settings): JsonResponse
     {
         abort_unless($settings->bool('trips_enabled'), 404);
@@ -54,7 +57,7 @@ final class TripController extends Controller
     {
         abort_unless($settings->bool('trips_enabled'), 404);
         $trip = Trip::query()->published()->where('slug', $slug)->with('media')->firstOrFail();
-        $booking = $this->bookingConfiguration($trip, $settings);
+        $booking = $this->bookingConfiguration->forTrip($trip);
         $content = TripContentData::forTrip($trip);
 
         return response()->json(['data' => [
@@ -81,28 +84,19 @@ final class TripController extends Controller
         ]]);
     }
 
-    /** Static data for the first, dedicated pickup-selection step. */
-    public function pickupConfig(string $slug, SettingsService $settings): JsonResponse
-    {
-        abort_unless($settings->bool('trips_enabled'), 404);
-        $trip = Trip::query()->published()->where('slug', $slug)->firstOrFail();
-
-        return response()->json(['data' => $this->pickupConfiguration($trip)]);
-    }
-
-    /** Static data for the combined journey-details and vehicle-results step. */
+    /** Complete static configuration for the trip booking flow. */
     public function journeyConfig(string $slug, SettingsService $settings): JsonResponse
     {
         abort_unless($settings->bool('trips_enabled'), 404);
         $trip = Trip::query()->published()->where('slug', $slug)->firstOrFail();
-        $booking = $this->bookingConfiguration($trip, $settings);
+        $booking = $this->bookingConfiguration->forTrip($trip);
 
         return response()->json(['data' => [
             'start_booking_allowed' => $booking['start_booking_allowed'],
             'reason' => $booking['reason'],
+            'pickup' => $booking['pickup'],
             'schedule' => $booking['schedule'],
             'travellers' => $booking['travellers'],
-            'addons' => $booking['addons'],
             'pricing' => $booking['pricing'],
             'quote_endpoint' => $booking['flow']['quote_endpoint'],
             'enquiry_endpoint' => $booking['flow']['enquiry_endpoint'],
@@ -137,143 +131,8 @@ final class TripController extends Controller
     {
         abort_unless($settings->bool('trips_enabled'), 404);
         $trip = Trip::query()->published()->where('slug', $slug)->firstOrFail();
-        $snapshot = $quotes->create($trip, $request->integer('departure_id') ?: null, $request->input('custom_departure_time'), $request->travelDate(), (int) $request->input('travellers'), (string) $request->input('pickup_place_id'), trim((string) $request->input('pickup_address')), $request->addons());
+        $snapshot = $quotes->create($trip, $request->integer('departure_id') ?: null, $request->input('custom_departure_time'), $request->travelDate(), (int) $request->input('travellers'), (string) $request->input('pickup_place_id'), trim((string) $request->input('pickup_address')));
         return (new QuoteResource($snapshot))->additional(['meta' => ['type' => 'trip', 'trip_slug' => $trip->slug]])->response()->setStatusCode(201);
-    }
-
-    /** @return array<string, mixed> */
-    private function bookingConfiguration(Trip $trip, SettingsService $settings): array
-    {
-        $trip->load([
-            'tripLocations.location',
-            'departures' => fn ($departures) => $departures->where('is_active', true),
-            'addons' => fn ($addons) => $addons->where('is_active', true),
-            'prices' => fn ($prices) => $prices->where('is_active', true)
-                ->whereHas('vehicle', fn ($vehicles) => $vehicles->where('is_active', true)->whereHas('category', fn ($categories) => $categories->where('is_active', true))),
-        ]);
-
-        $allPickups = $trip->tripLocations->where('role', \App\Models\TripLocation::PICKUP)->values();
-        $validPickups = $allPickups
-            ->filter(fn ($link) => $link->location?->is_active && $link->location?->google_place_id && $link->duration_minutes > 0)
-            ->values();
-        // A trip either accepts any customer pickup, or requires one of its approved
-        // pickup locations. Durations only apply to the latter.
-        $pickupConfigured = ! $trip->pickup_locations_only
-            || ($validPickups->isNotEmpty() && $validPickups->count() === $allPickups->count());
-        $fixedPricesByPickup = $trip->pricing_mode === 'fixed' && $trip->pickup_locations_only && $pickupConfigured
-            ? $trip->prices->groupBy('pickup_location_id')
-            : collect();
-
-        $departureLocations = $trip->pickup_locations_only && $pickupConfigured
-            ? $validPickups->map(function ($link) use ($fixedPricesByPickup): array {
-                $location = [
-                    'id' => $link->location_id,
-                    'name' => $link->location->name,
-                    'place_id' => $link->location->google_place_id,
-                    'address' => $link->location->formatted_address,
-                    'duration_minutes' => (int) $link->duration_minutes,
-                ];
-                if ($fixedPricesByPickup->isNotEmpty()) {
-                    $location['starting_from_price_minor'] = $fixedPricesByPickup->get($link->location_id, collect())->min('price_minor');
-                }
-
-                return $location;
-            })->values()
-            : collect();
-        $fixedPricingConfigured = $trip->pricing_mode !== 'fixed'
-            || ($departureLocations->isNotEmpty() && $departureLocations->every(fn (array $location) => ($location['starting_from_price_minor'] ?? null) !== null));
-        $destination = $trip->tripLocations->firstWhere('role', \App\Models\TripLocation::MAIN_DESTINATION)?->location;
-        $destinationConfigured = $destination?->is_active && $destination->google_place_id;
-
-        $reason = match (true) {
-            $trip->pricing_mode === 'enquiry' => 'enquiry_only',
-            ! $pickupConfigured => 'pickup_configuration_required',
-            $trip->pricing_mode === 'distance' && ! $destinationConfigured => 'destination_configuration_required',
-            ! $fixedPricingConfigured => 'fixed_pricing_configuration_required',
-            default => null,
-        };
-        $onlineBookingAllowed = $reason === null;
-        $baseEndpoint = '/api/public/trips/'.$trip->slug;
-
-        return [
-            'start_booking_allowed' => $onlineBookingAllowed,
-            'reason' => $reason,
-            'pricing_mode' => $trip->pricing_mode,
-            'pickup' => [
-                'mode' => $trip->pickup_locations_only ? 'selected' : 'custom',
-                'custom_allowed' => ! $trip->pickup_locations_only,
-                'locations' => $departureLocations,
-            ],
-            'schedule' => [
-                'mode' => $trip->fixed_departures_only ? 'fixed' : 'custom',
-                'date_required' => true,
-                'fixed_departures' => $trip->fixed_departures_only
-                    ? $trip->departures->map(fn ($departure) => ['id' => $departure->id, 'start_time' => substr((string) $departure->start_time, 0, 5)])->values()
-                    : [],
-                'min_notice_hours' => $settings->int('trip_min_notice_hours'),
-            ],
-            'travellers' => [
-                // A passenger count is always needed to select a vehicle. This flag
-                // controls only whether this trip's own min/max range is enforced.
-                'selection_required' => true,
-                'limits_applied' => $trip->traveller_limits_enabled,
-                'min' => $trip->traveller_limits_enabled ? $trip->min_travellers : 1,
-                'max' => $trip->traveller_limits_enabled ? $trip->max_travellers : 99,
-            ],
-            'addons' => $onlineBookingAllowed
-                ? $trip->addons->map(fn ($addon) => ['id' => $addon->id, 'name' => $addon->name, 'description' => $addon->description, 'price_minor' => $addon->price_minor, 'max_quantity' => $addon->max_quantity])->values()
-                : [],
-            'pricing' => [
-                'mode' => match ($trip->pricing_mode) {
-                    'fixed' => 'fixed',
-                    'distance' => 'route_based',
-                    default => 'enquiry',
-                },
-                'currency' => $settings->string('currency'),
-                'starting_from_price_minor' => $trip->pricing_mode === 'fixed' ? $fixedPricesByPickup->flatten(1)->min('price_minor') : null,
-                'quote_required' => $trip->pricing_mode === 'distance',
-            ],
-            'flow' => [
-                'next_step' => $onlineBookingAllowed ? 'quote' : 'enquiry',
-                'quote_endpoint' => $onlineBookingAllowed ? $baseEndpoint.'/quotes' : null,
-                // Availability slots require a configured pickup duration, which only
-                // exists for selected pickup locations. Custom pickups are checked by
-                // the quote endpoint after their route has been calculated.
-                'availability_endpoint' => $onlineBookingAllowed && $trip->pickup_locations_only && $trip->fixed_departures_only ? $baseEndpoint.'/availability' : null,
-                'enquiry_endpoint' => $baseEndpoint.'/enquiries',
-            ],
-        ];
-    }
-
-    /** @return array{mode:string,custom_allowed:bool,locations:\Illuminate\Support\Collection<int, array<string, mixed>>} */
-    private function pickupConfiguration(Trip $trip): array
-    {
-        if (! $trip->pickup_locations_only) {
-            return [
-                'mode' => 'custom',
-                'custom_allowed' => true,
-                'locations' => collect(),
-            ];
-        }
-
-        $trip->loadMissing('tripLocations.location');
-        $locations = $trip->tripLocations
-            ->where('role', \App\Models\TripLocation::PICKUP)
-            ->filter(fn ($link) => $link->location?->is_active && $link->location?->google_place_id && $link->duration_minutes > 0)
-            ->map(fn ($link) => [
-                'id' => $link->location_id,
-                'name' => $link->location->name,
-                'place_id' => $link->location->google_place_id,
-                'address' => $link->location->formatted_address,
-                'duration_minutes' => (int) $link->duration_minutes,
-            ])
-            ->values();
-
-        return [
-            'mode' => 'selected',
-            'custom_allowed' => false,
-            'locations' => $locations,
-        ];
     }
 
     /** @return array{status:string,free_vehicles?:int} */

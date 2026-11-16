@@ -10,6 +10,6 @@ class TripPrice extends Model
     protected $fillable = ['trip_id', 'pickup_location_id', 'vehicle_id', 'price_minor', 'is_active'];
     protected function casts(): array { return ['is_active' => 'boolean']; }
     public function trip(): BelongsTo { return $this->belongsTo(Trip::class); }
-    public function vehicle(): BelongsTo { return $this->belongsTo(Vehicle::class)->withTrashed(); }
+    public function vehicle(): BelongsTo { return $this->belongsTo(Vehicle::class); }
     public function pickupLocation(): BelongsTo { return $this->belongsTo(Location::class, 'pickup_location_id')->withTrashed(); }
 }

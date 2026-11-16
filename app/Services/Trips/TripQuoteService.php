@@ -27,11 +27,10 @@ final class TripQuoteService
         private readonly PricingService $pricing, private readonly VatCalculator $vat, private readonly QuoteStore $store,
     ) {}
 
-    /** @param array<int, int> $addonQuantities */
-    public function create(Trip $trip, ?int $departureId, ?string $customDepartureTime, CarbonImmutable $date, int $travellers, string $pickupPlaceId, string $pickupAddress, array $addonQuantities): QuoteSnapshot
+    public function create(Trip $trip, ?int $departureId, ?string $customDepartureTime, CarbonImmutable $date, int $travellers, string $pickupPlaceId, string $pickupAddress): QuoteSnapshot
     {
         if (! $this->settings->bool('trips_enabled')) throw new BookingException('trips_disabled', 'Trips are not available at the moment.', 404);
-        $trip->loadMissing(['departures', 'blackouts', 'addons', 'prices.vehicle.category.media', 'prices.vehicle.media', 'tripLocations.location']);
+        $trip->loadMissing(['departures', 'blackouts', 'prices.vehicle.category.media', 'prices.vehicle.media', 'tripLocations.location']);
         if ($trip->pricing_mode === 'enquiry') throw new BookingException('trip_enquiry_only', 'This trip is available by enquiry only.', 422);
         if ($trip->traveller_limits_enabled && ($travellers < $trip->min_travellers || $travellers > $trip->max_travellers)) {
             throw new BookingException('trip_traveller_limit', "This trip is available for {$trip->min_travellers} to {$trip->max_travellers} travellers.", 422);
@@ -67,15 +66,6 @@ final class TripQuoteService
         $travelDurationS = $route->durationS * 2;
         $availabilityWindow = $this->availability->occupiedWindow($window['start'], $durationMinutes * 60 + $travelDurationS);
 
-        $extras = []; $extrasTotal = 0;
-        foreach ($addonQuantities as $addonId => $quantity) {
-            if ($quantity < 1) continue;
-            $addon = $trip->addons->firstWhere('id', $addonId);
-            if ($addon === null || ! $addon->is_active || $quantity > $addon->max_quantity) throw new BookingException('trip_addon_invalid', 'One of the selected add-ons is not available in that quantity.');
-            $total = $addon->price_minor * $quantity; $extrasTotal += $total;
-            $extras[] = ['trip_addon_id' => $addon->id, 'name' => $addon->name, 'price_minor' => $addon->price_minor, 'quantity' => $quantity, 'total_minor' => $total];
-        }
-
         $offers = [];
         $candidates = $trip->pricing_mode === 'distance'
             ? Vehicle::query()->with(['category.media', 'media'])->bookable()->get()->map(fn ($vehicle) => ['vehicle' => $vehicle, 'fixed_price' => null])
@@ -84,7 +74,7 @@ final class TripQuoteService
             $vehicle = $candidate['vehicle']; $fixedPrice = $candidate['fixed_price'];
             if ($vehicle === null || ($fixedPrice !== null && ! $fixedPrice->is_active) || ! $vehicle->is_active || ! $vehicle->category?->is_active || $vehicle->passenger_capacity < $travellers || ! $this->availability->hasFreeUnit($vehicle, $availabilityWindow['from'], $availabilityWindow['to'])) continue;
             $base = $fixedPrice?->price_minor ?? $this->pricing->price($vehicle, $route, true, 0)->subtotal;
-            $subtotal = $base + $extrasTotal; $split = $this->vat->split($subtotal);
+            $subtotal = $base; $split = $this->vat->split($subtotal);
             $offers[$vehicle->id] = [
                 'vehicle_id' => $vehicle->id,
                 // Retained for existing quote consumers; new trip screens should use vehicle.
@@ -102,9 +92,7 @@ final class TripQuoteService
                     'legs' => ['outbound' => $subtotal],
                     'discount' => 0,
                     'subtotal' => $subtotal,
-                    'addons' => $extrasTotal,
                     'base_minor' => $base,
-                    'addons_minor' => $extrasTotal,
                     'subtotal_minor' => $subtotal,
                     'total_minor' => $split->gross,
                 ],
@@ -114,7 +102,7 @@ final class TripQuoteService
         if ($offers === []) throw new BookingException('trip_sold_out', 'No vehicle is available for this trip departure.', 409);
 
         $ttl = $this->settings->int('quote_ttl_minutes');
-        $snapshot = new QuoteSnapshot(bin2hex(random_bytes(32)), CarbonImmutable::now('UTC')->addMinutes($ttl), $this->settings->string('currency'), $travellers, 0, [['direction' => 'outbound', 'pickup' => ['place_id' => $pickup->placeId, 'address' => $pickupAddress], 'dropoff' => ['place_id' => $pickup->placeId, 'address' => $pickupAddress], 'starts_at' => $window['start']->toIso8601String(), 'distance_m' => $travelDistanceM, 'duration_s' => $durationMinutes * 60 + $travelDurationS]], $offers, $this->paymentMethods(), ['type' => 'trip', 'trip_id' => $trip->id, 'departure_id' => $departure?->id, 'pickup_location_id' => $pickupLink?->location_id, 'addons' => $extras]);
+        $snapshot = new QuoteSnapshot(bin2hex(random_bytes(32)), CarbonImmutable::now('UTC')->addMinutes($ttl), $this->settings->string('currency'), $travellers, 0, [['direction' => 'outbound', 'pickup' => ['place_id' => $pickup->placeId, 'address' => $pickupAddress], 'dropoff' => ['place_id' => $pickup->placeId, 'address' => $pickupAddress], 'starts_at' => $window['start']->toIso8601String(), 'distance_m' => $travelDistanceM, 'duration_s' => $durationMinutes * 60 + $travelDurationS]], $offers, $this->paymentMethods(), ['type' => 'trip', 'trip_id' => $trip->id, 'departure_id' => $departure?->id, 'pickup_location_id' => $pickupLink?->location_id]);
         $this->store->put($snapshot, $ttl * 60);
         return $snapshot;
     }

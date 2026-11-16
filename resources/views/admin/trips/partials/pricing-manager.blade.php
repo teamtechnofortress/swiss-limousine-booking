@@ -52,7 +52,6 @@
 
             <section data-pricing-mode-panel="enquiry" class="rounded-2xl border border-slate-200 bg-slate-50 p-5"><h3 class="font-bold text-slate-900">Enquiry-only trip</h3><p class="mt-2 text-sm leading-6 text-slate-600">Customers can submit their trip details for a custom quotation. No price or vehicle choice is shown online.</p></section>
 
-            @include('admin.trips.partials.pricing-addons', ['trip' => $trip])
         </div>
         <div class="flex justify-end border-t border-slate-100 p-5"><button class="admin-button">Save pricing</button></div>
     </form>
@@ -60,14 +59,9 @@
 
 <script>
 (() => {
-    const root=document.querySelector('[data-trip-pricing-manager]');if(!root)return;const modes=[...root.querySelectorAll('input[name="pricing_mode"]')],panels=[...root.querySelectorAll('[data-pricing-mode-panel]')],offers=[...root.querySelectorAll('[data-price-offer]')],refresh=root.querySelector('[data-refresh-route-estimates]'),status=root.querySelector('[data-route-estimate-status]'),addons=root.querySelector('[data-pricing-addons]'),addonList=root.querySelector('[data-addon-list]'),addonEmpty=root.querySelector('[data-addon-empty]'),addonTemplate=root.querySelector('[data-addon-template]'),addAddon=root.querySelector('[data-add-addon]');
-    const sync=()=>{const mode=modes.find(input=>input.checked)?.value,onlineMode=['fixed','distance'].includes(mode);panels.forEach(panel=>panel.hidden=panel.dataset.pricingModePanel!==mode);if(addons){addons.hidden=!onlineMode;addons.querySelectorAll('[data-addon-input]').forEach(input=>input.disabled=!onlineMode);}offers.forEach(offer=>{const price=offer.closest('[data-pricing-vehicle]')?.querySelector('[data-fixed-price]');if(!price)return;price.disabled=false;price.required=offer.checked;});};
+    const root=document.querySelector('[data-trip-pricing-manager]');if(!root)return;const modes=[...root.querySelectorAll('input[name="pricing_mode"]')],panels=[...root.querySelectorAll('[data-pricing-mode-panel]')],offers=[...root.querySelectorAll('[data-price-offer]')],refresh=root.querySelector('[data-refresh-route-estimates]'),status=root.querySelector('[data-route-estimate-status]');
+    const sync=()=>{const mode=modes.find(input=>input.checked)?.value;panels.forEach(panel=>panel.hidden=panel.dataset.pricingModePanel!==mode);offers.forEach(offer=>{const price=offer.closest('[data-pricing-vehicle]')?.querySelector('[data-fixed-price]');if(!price)return;price.disabled=false;price.required=offer.checked;});};
     modes.forEach(input=>input.addEventListener('change',sync));offers.forEach(input=>input.addEventListener('change',sync));root.querySelectorAll('[data-fixed-price]').forEach(price=>price.addEventListener('input',()=>{if(price.value==='')return;const offer=price.closest('[data-pricing-vehicle]')?.querySelector('[data-price-offer]');if(offer&&!offer.checked){offer.checked=true;sync();}}));sync();
     refresh?.addEventListener('click',async()=>{refresh.disabled=true;refresh.textContent='Calculating…';status.textContent='Calculating the complete return route from Google…';try{const response=await fetch(root.dataset.estimatesUrl,{headers:{Accept:'application/json'}}),payload=await response.json();if(!response.ok)throw new Error(payload.message||'Could not load estimates.');payload.data.forEach(row=>{const summary=root.querySelector(`[data-route-summary="${row.pickup_location_id}"]`);if(summary)summary.textContent=`${row.distance_km} km · ${row.duration_minutes} min`;Object.entries(row.vehicle_prices).forEach(([vehicleId,amount])=>{const item=root.querySelector(`[data-route-estimate="${row.pickup_location_id}:${vehicleId}"]`);if(item)item.textContent=`CHF ${(Number(amount)/100).toFixed(2)}`;});});status.innerHTML='<span class="mt-2 size-1.5 shrink-0 rounded-full bg-emerald-500"></span><span><strong>Live estimates updated.</strong> Every distance, drive time and estimated fare includes pickup → primary destination → pickup.</span>';}catch(error){status.textContent=error.message;}finally{refresh.disabled=false;refresh.textContent='Update route estimates';}});
-    const syncAddons=()=>{if(addonEmpty)addonEmpty.classList.toggle('hidden',addonList?.querySelectorAll('[data-addon-row]').length>0);};
-    const removeAddon=row=>{row.remove();syncAddons();};
-    addonList?.querySelectorAll('[data-remove-addon]').forEach(button=>button.addEventListener('click',()=>removeAddon(button.closest('[data-addon-row]'))));
-    addAddon?.addEventListener('click',()=>{const row=addonTemplate.content.firstElementChild.cloneNode(true),index=Date.now();row.querySelectorAll('[data-addon-field]').forEach(field=>field.name=`addons[${index}][${field.dataset.addonField}]`);row.querySelector('[data-remove-addon]').addEventListener('click',()=>removeAddon(row));addonList.append(row);syncAddons();row.querySelector('input')?.focus();});
-    syncAddons();
 })();
 </script>

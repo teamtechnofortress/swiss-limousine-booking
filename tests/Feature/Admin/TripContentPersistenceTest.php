@@ -75,7 +75,9 @@ final class TripContentPersistenceTest extends TestCase
         $this->get(route('admin.trips.edit', $trip))->assertOk()
             ->assertSee('Explore the mountains.')->assertSee('value="Mercedes V-Class"', false)
             ->assertSee('value="Innsbruck"', false)->assertSee($data['hero_image_url'], false)
-            ->assertSee($data['stops'][1]['image_url'], false);
+            ->assertSee($data['stops'][1]['image_url'], false)
+            ->assertSee('Online booking is not available')
+            ->assertSee('Choose an active primary destination that is linked to Google for route-based pricing.');
 
         $fields['country_existing'] = [0, 1];
         $fields['stops'][0]['existing_index'] = 0;

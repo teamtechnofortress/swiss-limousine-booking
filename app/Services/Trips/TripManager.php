@@ -21,7 +21,7 @@ final class TripManager
         $data['pricing_mode'] ??= 'fixed';
         $data['min_travellers'] ??= 1;
         $data['max_travellers'] ??= 99;
-        $data['traveller_limits_enabled'] ??= true;
+        $data['traveller_limits_enabled'] ??= false;
         return Trip::query()->create($data);
     }
 

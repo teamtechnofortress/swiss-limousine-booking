@@ -11,6 +11,7 @@ use App\Services\Geo\GoogleMapsClient;
 use App\Services\Pricing\PricingService;
 use App\Services\Trips\TripManager;
 use App\Services\Trips\TripContentData;
+use App\Services\Trips\TripBookingConfiguration;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,6 +31,7 @@ final class AdminTripController extends Controller
         private readonly TripManager $trips,
         private readonly GoogleMapsClient $maps,
         private readonly PricingService $pricing,
+        private readonly TripBookingConfiguration $bookingConfiguration,
     ) {}
 
     public function index(Request $request): View
@@ -40,7 +42,17 @@ final class AdminTripController extends Controller
     }
     public function create(): View { return view('admin.trips.create'); }
     public function store(Request $request): RedirectResponse { $trip = $this->trips->create($this->overview($request)); return redirect()->route('admin.trips.edit', $trip)->with('status', 'Trip draft created. Complete each checklist item before publishing.'); }
-    public function edit(Trip $trip): View { return view('admin.trips.edit', ['trip' => $trip->load(['departures', 'items', 'addons', 'prices.vehicle', 'blackouts', 'tripLocations.location', 'media']), 'vehicles' => Vehicle::query()->with('category')->orderBy('name')->get(), 'checklist' => $this->trips->checklist($trip)]); }
+    public function edit(Trip $trip): View
+    {
+        $bookingConfiguration = $this->bookingConfiguration->forTrip(Trip::query()->findOrFail($trip->id));
+
+        return view('admin.trips.edit', [
+            'trip' => $trip->load(['departures', 'items', 'addons', 'prices.vehicle', 'blackouts', 'tripLocations.location', 'media']),
+            'vehicles' => Vehicle::query()->with('category')->orderBy('name')->get(),
+            'checklist' => $this->trips->checklist($trip),
+            'bookingConfiguration' => $bookingConfiguration,
+        ]);
+    }
     public function update(Trip $trip, Request $request): RedirectResponse { $this->trips->update($trip, $this->overview($request)); return $this->stepRedirect($trip, $request)->with('status', 'Trip overview saved.'); }
     public function departures(Trip $trip, Request $request): RedirectResponse { $request->validate(['fixed_departures_only' => ['required','boolean']]); $fixedOnly = $request->boolean('fixed_departures_only'); $trip->update(['fixed_departures_only' => $fixedOnly]); if ($fixedOnly) $this->trips->replaceDepartures($trip, $this->rows($request, 'departures', ['start_time' => ['required','date_format:H:i'], 'is_active' => ['nullable','boolean']])); return $this->stepRedirect($trip, $request)->with('status', $fixedOnly ? 'Fixed departure times saved.' : 'Customers can now choose a custom departure time.'); }
    public function content(Trip $trip, Request $request): RedirectResponse
