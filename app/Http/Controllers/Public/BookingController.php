@@ -38,7 +38,7 @@ final class BookingController extends Controller
             event(new BookingCreated($booking, $created->accessToken, $created->verificationToken));
         }
 
-        return (new PublicBookingResource($booking->loadMissing(['legs', 'payment', 'vehicle'])))
+        return (new PublicBookingResource($booking->loadMissing(['trip', 'legs', 'payment', 'vehicle'])))
             ->additional(['meta' => [
                 // Shown once, to the browser that created the booking. Also sent by email.
                 'access_token' => $created->accessToken,
@@ -52,7 +52,7 @@ final class BookingController extends Controller
     {
         $booking = $bookings->findForCustomer($reference, (string) $request->header('X-Access-Token'));
 
-        return new PublicBookingResource($booking->loadMissing(['legs', 'payment', 'vehicle']));
+        return new PublicBookingResource($booking->loadMissing(['trip', 'legs', 'payment', 'vehicle']));
     }
 
     public function checkout(string $reference, Request $request, BookingService $bookings): JsonResponse
@@ -76,6 +76,6 @@ final class BookingController extends Controller
     {
         $booking = $bookings->verifyCashOnArrival($token);
 
-        return new PublicBookingResource($booking->loadMissing(['legs', 'payment', 'vehicle']));
+        return new PublicBookingResource($booking->loadMissing(['trip', 'legs', 'payment', 'vehicle']));
     }
 }

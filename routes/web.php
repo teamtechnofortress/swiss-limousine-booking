@@ -60,6 +60,8 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
             Route::post('trips', [AdminTripController::class, 'store'])->name('trips.store');
             Route::get('trips/{trip}/edit', [AdminTripController::class, 'edit'])->name('trips.edit');
             Route::patch('trips/{trip}', [AdminTripController::class, 'update'])->name('trips.update');
+            Route::delete('trips/{trip}', [AdminTripController::class, 'destroy'])->name('trips.destroy');
+            Route::put('trips/{trip}/featured', [AdminTripController::class, 'featured'])->name('trips.featured');
             Route::put('trips/{trip}/departures', [AdminTripController::class, 'departures'])->name('trips.departures');
             Route::put('trips/{trip}/content', [AdminTripController::class, 'content'])->name('trips.content');
             Route::put('trips/{trip}/faqs', [AdminTripController::class, 'faqs'])->name('trips.faqs');

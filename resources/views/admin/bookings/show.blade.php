@@ -19,6 +19,8 @@
 
     <div class="grid gap-6 xl:grid-cols-[1.55fr_1fr]">
         <div class="space-y-6">
+            <x-admin.trip-booking-card :booking="$booking" />
+
             <article class="admin-card p-6">
                 <h3 class="text-base font-bold text-slate-900">Customer &amp; journey</h3>
 

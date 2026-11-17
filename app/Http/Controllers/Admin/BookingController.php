@@ -37,7 +37,7 @@ final class BookingController extends Controller
     {
         $admin->markSeen($booking);
 
-        return new AdminBookingResource($booking->load(['vehicle', 'fleetUnit', 'legs', 'payment.refunds', 'adjustments']));
+        return new AdminBookingResource($booking->load(['trip', 'vehicle', 'fleetUnit', 'legs', 'payment.refunds', 'adjustments']));
     }
 
     public function assign(Booking $booking, AssignUnitRequest $request, BookingAdminService $admin): AdminBookingResource

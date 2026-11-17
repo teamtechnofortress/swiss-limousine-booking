@@ -18,6 +18,8 @@ final class AdminBookingResource extends JsonResource
         return [
             'id' => $this->id,
             'reference' => $this->reference,
+            'type' => $this->type,
+            'trip' => $this->tripData(),
             'status' => $this->status->value,
             'source' => $this->source,
             'is_new' => $isNew,
@@ -86,6 +88,31 @@ final class AdminBookingResource extends JsonResource
             'verified_at' => $this->verified_at?->toIso8601String(),
             'paid_at' => $this->paid_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
+        ];
+    }
+
+    /** @return array<string, mixed>|null */
+    private function tripData(): ?array
+    {
+        if ($this->type !== 'trip') {
+            return null;
+        }
+
+        $snapshot = $this->trip_snapshot;
+        $trip = $this->relationLoaded('trip') ? $this->trip : null;
+
+        if (! is_array($snapshot) && $trip === null) {
+            return null;
+        }
+
+        return [
+            'id' => $trip?->id,
+            'title' => $snapshot['title'] ?? $trip?->title,
+            'subtitle' => $snapshot['subtitle'] ?? $trip?->subtitle,
+            'summary' => $snapshot['summary'] ?? $trip?->summary,
+            'region' => $snapshot['region'] ?? $trip?->region,
+            'slug' => $snapshot['slug'] ?? $trip?->slug,
+            'pricing_mode' => $snapshot['pricing_mode'] ?? $trip?->pricing_mode,
         ];
     }
 }

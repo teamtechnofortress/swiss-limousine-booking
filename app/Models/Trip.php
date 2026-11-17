@@ -37,6 +37,24 @@ class Trip extends Model implements HasMedia
 
     public function scopePublished(Builder $query): Builder { return $query->where('status', 'published'); }
 
+    /**
+     * The booking keeps this small, customer-facing snapshot so later edits to a
+     * trip do not change the trip identity shown for a completed booking.
+     *
+     * @return array<string, mixed>
+     */
+    public function bookingSnapshot(): array
+    {
+        return [
+            'title' => $this->title,
+            'subtitle' => $this->subtitle,
+            'summary' => $this->summary,
+            'region' => $this->region,
+            'slug' => $this->slug,
+            'pricing_mode' => $this->pricing_mode,
+        ];
+    }
+
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('cover')->singleFile()->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp']);

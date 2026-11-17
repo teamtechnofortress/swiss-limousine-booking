@@ -14,6 +14,8 @@ final class PublicBookingResource extends JsonResource
     {
         return [
             'reference' => $this->reference,
+            'type' => $this->type,
+            'trip' => $this->tripData(),
             'status' => $this->status->value,
             'payment_method' => $this->payment_method->value,
             'payment_status' => $this->payment?->status?->value,
@@ -35,6 +37,30 @@ final class PublicBookingResource extends JsonResource
             'legs' => BookingLegResource::collection($this->legs),
             'hold_expires_at' => $this->hold_expires_at?->toIso8601String(),
             'cancellation_requested_at' => $this->cancellation_requested_at?->toIso8601String(),
+        ];
+    }
+
+    /** @return array<string, mixed>|null */
+    private function tripData(): ?array
+    {
+        if ($this->type !== 'trip') {
+            return null;
+        }
+
+        $snapshot = $this->trip_snapshot;
+        $trip = $this->relationLoaded('trip') ? $this->trip : null;
+
+        if (! is_array($snapshot) && $trip === null) {
+            return null;
+        }
+
+        return [
+            'title' => $snapshot['title'] ?? $trip?->title,
+            'subtitle' => $snapshot['subtitle'] ?? $trip?->subtitle,
+            'summary' => $snapshot['summary'] ?? $trip?->summary,
+            'region' => $snapshot['region'] ?? $trip?->region,
+            'slug' => $snapshot['slug'] ?? $trip?->slug,
+            'pricing_mode' => $snapshot['pricing_mode'] ?? $trip?->pricing_mode,
         ];
     }
 }

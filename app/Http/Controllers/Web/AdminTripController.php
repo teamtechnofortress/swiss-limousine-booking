@@ -37,7 +37,7 @@ final class AdminTripController extends Controller
     public function index(Request $request): View
     {
         $filters = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'status' => ['nullable', 'in:draft,published,archived']]);
-        $trips = Trip::query()->withCount(['departures', 'prices'])->when($filters['q'] ?? null, fn ($q, $term) => $q->where('title', 'like', '%'.addcslashes($term, '%_\\').'%'))->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))->orderBy('sort_order')->orderBy('title')->get();
+        $trips = Trip::query()->with('media')->withCount(['departures', 'prices'])->when($filters['q'] ?? null, fn ($q, $term) => $q->where('title', 'like', '%'.addcslashes($term, '%_\\').'%'))->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))->orderBy('sort_order')->orderBy('title')->get();
         return view('admin.trips.index', compact('trips', 'filters'));
     }
     public function create(): View { return view('admin.trips.create'); }
@@ -47,13 +47,34 @@ final class AdminTripController extends Controller
         $bookingConfiguration = $this->bookingConfiguration->forTrip(Trip::query()->findOrFail($trip->id));
 
         return view('admin.trips.edit', [
-            'trip' => $trip->load(['departures', 'items', 'addons', 'prices.vehicle', 'blackouts', 'tripLocations.location', 'media']),
+            'trip' => $trip->load(['departures', 'items', 'addons', 'prices.vehicle', 'blackouts', 'tripLocations.location', 'media'])->loadCount(['bookings' => fn ($query) => $query->withTrashed()]),
             'vehicles' => Vehicle::query()->with('category')->orderBy('name')->get(),
             'checklist' => $this->trips->checklist($trip),
             'bookingConfiguration' => $bookingConfiguration,
         ]);
     }
     public function update(Trip $trip, Request $request): RedirectResponse { $this->trips->update($trip, $this->overview($request)); return $this->stepRedirect($trip, $request)->with('status', 'Trip overview saved.'); }
+
+    public function destroy(Trip $trip): RedirectResponse
+    {
+        if (Booking::withTrashed()->where('trip_id', $trip->id)->exists()) {
+            return back()->withErrors(['trip' => 'This trip has booking history and cannot be deleted. Archive it instead.']);
+        }
+
+        $trip->delete();
+
+        return redirect()->route('admin.trips.index')->with('status', 'Trip deleted.');
+    }
+
+    public function featured(Trip $trip, Request $request): RedirectResponse
+    {
+        $data = $request->validate(['is_featured' => ['required', 'boolean']]);
+        $isFeatured = (bool) $data['is_featured'];
+
+        $trip->update(['is_featured' => $isFeatured]);
+
+        return back()->with('status', $isFeatured ? 'Trip featured on the website.' : 'Trip removed from featured trips.');
+    }
     public function departures(Trip $trip, Request $request): RedirectResponse { $request->validate(['fixed_departures_only' => ['required','boolean']]); $fixedOnly = $request->boolean('fixed_departures_only'); $trip->update(['fixed_departures_only' => $fixedOnly]); if ($fixedOnly) $this->trips->replaceDepartures($trip, $this->rows($request, 'departures', ['start_time' => ['required','date_format:H:i'], 'is_active' => ['nullable','boolean']])); return $this->stepRedirect($trip, $request)->with('status', $fixedOnly ? 'Fixed departure times saved.' : 'Customers can now choose a custom departure time.'); }
    public function content(Trip $trip, Request $request): RedirectResponse
 {

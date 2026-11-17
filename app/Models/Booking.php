@@ -25,7 +25,7 @@ class Booking extends Model
         'vat_registration_number', 'price_breakdown', 'access_token_hash', 'verification_token_hash',
         'hold_expires_at', 'verified_at', 'paid_at', 'admin_seen_at',
         'cancellation_requested_at', 'cancellation_reason', 'cancelled_at', 'completed_at',
-        'type', 'trip_id',
+        'type', 'trip_id', 'trip_snapshot',
     ];
 
     protected function casts(): array
@@ -35,6 +35,7 @@ class Booking extends Model
             'payment_method' => PaymentMethod::class,
             'vat_included' => 'boolean',
             'price_breakdown' => 'array',
+            'trip_snapshot' => 'array',
             'hold_expires_at' => 'datetime',
             'verified_at' => 'datetime',
             'paid_at' => 'datetime',

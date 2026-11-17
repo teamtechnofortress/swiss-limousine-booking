@@ -33,7 +33,7 @@ final class BookingRepository implements BookingRepositoryInterface
     public function findByReference(string $reference): ?Booking
     {
         return Booking::query()
-            ->with(['legs', 'payment', 'vehicle'])
+            ->with(['trip', 'legs', 'payment', 'vehicle'])
             ->where('reference', $reference)
             ->first();
     }
@@ -66,7 +66,7 @@ final class BookingRepository implements BookingRepositoryInterface
     public function paginateForAdmin(array $filters, int $perPage): LengthAwarePaginator
     {
         $query = Booking::query()
-            ->with(['vehicle', 'fleetUnit', 'payment', 'legs'])
+            ->with(['trip', 'vehicle', 'fleetUnit', 'payment', 'legs'])
             ->adminQueue();
 
         if (! empty($filters['status'])) {

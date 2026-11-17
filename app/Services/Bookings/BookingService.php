@@ -93,7 +93,7 @@ final class BookingService
                     return [$existing->load(['legs', 'payment', 'vehicle']), false];
                 }
 
-                $this->assertTripCanStillBeBooked($snapshot->context, true);
+                $trip = $this->bookableTrip($snapshot->context, true);
 
                 $vehicle = $this->vehicles->lockVehicle($data->vehicleId);
                 $windows = $this->legWindows($snapshot->legs);
@@ -103,6 +103,7 @@ final class BookingService
                     'reference' => $this->newReference(),
                     'type' => (string) ($snapshot->context['type'] ?? 'transfer'),
                     'trip_id' => $snapshot->context['trip_id'] ?? null,
+                    'trip_snapshot' => $trip?->bookingSnapshot(),
                     'quote_token_hash' => $quoteTokenHash,
                     'status' => $status,
                     'source' => 'website',
@@ -201,10 +202,10 @@ final class BookingService
      *
      * @param array<string, mixed> $context
      */
-    private function assertTripCanStillBeBooked(array $context, bool $lockForUpdate = false): void
+    private function bookableTrip(array $context, bool $lockForUpdate = false): ?Trip
     {
         if (($context['type'] ?? null) !== 'trip') {
-            return;
+            return null;
         }
 
         if (! $this->settings->bool('trips_enabled')) {
@@ -212,16 +213,18 @@ final class BookingService
         }
 
         $tripId = (int) ($context['trip_id'] ?? 0);
-        $isBookable = $tripId > 0 && Trip::query()
+        $trip = $tripId > 0 ? Trip::query()
             ->published()
             ->whereKey($tripId)
             ->whereIn('pricing_mode', ['fixed', 'distance'])
             ->when($lockForUpdate, fn ($query) => $query->lockForUpdate())
-            ->exists();
+            ->first() : null;
 
-        if (! $isBookable) {
+        if ($trip === null) {
             throw BookingException::tripBookingUnavailable();
         }
+
+        return $trip;
     }
 
     /**

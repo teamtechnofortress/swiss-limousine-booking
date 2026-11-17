@@ -6,6 +6,7 @@ use App\Enums\BookingStatus;
 use App\Enums\PaymentMethod;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\Trip;
 use App\Services\Bookings\BookingAdminService;
 use App\Services\Payments\PaymentService;
 use Illuminate\Http\RedirectResponse;
@@ -21,11 +22,17 @@ final class AdminBookingController extends Controller
             'payment_method' => ['nullable', 'in:'.implode(',', array_column(PaymentMethod::cases(), 'value'))],
             'q' => ['nullable', 'string', 'max:100'],
             'unseen' => ['nullable', 'boolean'],
+            'trip_id' => ['nullable', 'integer', 'exists:trips,id'],
         ]);
 
-        $bookings = Booking::query()->with(['vehicle', 'fleetUnit', 'payment', 'legs'])
+        $selectedTrip = isset($filters['trip_id'])
+            ? Trip::query()->withTrashed()->find((int) $filters['trip_id'])
+            : null;
+
+        $bookings = Booking::query()->with(['trip', 'vehicle', 'fleetUnit', 'payment', 'legs'])
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->when($filters['payment_method'] ?? null, fn ($q, $method) => $q->where('payment_method', $method))
+            ->when($selectedTrip !== null, fn ($q) => $q->where('trip_id', $selectedTrip->id))
             ->when($request->boolean('unseen'), fn ($q) => $q->unseen())
             ->when($filters['q'] ?? null, function ($q, string $term): void {
                 $term = '%'.addcslashes($term, '%_\\').'%';
@@ -35,13 +42,13 @@ final class AdminBookingController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return view('admin.bookings.index', compact('bookings', 'filters'));
+        return view('admin.bookings.index', compact('bookings', 'filters', 'selectedTrip'));
     }
 
     public function show(Booking $booking, BookingAdminService $service): View
     {
         $service->markSeen($booking);
-        $booking->load(['vehicle', 'fleetUnit', 'legs', 'payment.refunds', 'adjustments']);
+        $booking->load(['trip.media', 'vehicle', 'fleetUnit', 'legs', 'payment.refunds', 'adjustments']);
         $units = $booking->vehicle?->fleetUnits()->orderBy('plate')->get() ?? collect();
 
         return view('admin.bookings.show', compact('booking', 'units'));
