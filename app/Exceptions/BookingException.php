@@ -3,10 +3,11 @@
 namespace App\Exceptions;
 
 use App\Enums\BookingStatus;
+use Illuminate\Contracts\Debug\ShouldntReport;
 use RuntimeException;
 
 /** Domain errors that are safe to show to customers. Rendered by bootstrap/app.php with a stable code. */
-final class BookingException extends RuntimeException
+final class BookingException extends RuntimeException implements ShouldntReport
 {
     public function __construct(
         public readonly string $errorCode,

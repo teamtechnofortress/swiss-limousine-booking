@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Services\Settings\SettingsService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Browser-safe configuration needed before a customer can request a quote.
@@ -42,8 +41,6 @@ final class PublicConfigController extends Controller
             // A Turnstile site key is public by design. Never expose turnstile_secret_key.
             'turnstile_site_key' => $turnstileEnabled ? $settings->string('turnstile_site_key') : '',
         ];
-
-        Log::debug('Public booking configuration sent to browser.', ['config' => $config]);
 
         return response()->json([
             'data' => $config,
