@@ -21,6 +21,38 @@
     .admin-table td { @apply px-5 py-4 align-middle text-slate-600; }
     .admin-table tbody tr { @apply transition hover:bg-slate-50/80; }
 
+    /* Booking detail: give time-sensitive operational information a clear visual hierarchy. */
+    .booking-hero { position: relative; overflow: hidden; border: 1px solid #172554; border-radius: 1.25rem; background: linear-gradient(115deg, #0f172a 0%, #172554 58%, #312e81 100%); padding: 1.5rem; box-shadow: 0 18px 42px rgb(15 23 42 / .18); }
+    .booking-hero::before { content: ''; position: absolute; right: -5rem; top: -8rem; width: 22rem; height: 22rem; border-radius: 9999px; background: radial-gradient(circle, rgb(129 140 248 / .34), transparent 67%); }
+    .booking-back { color: #c7d2fe; transition: color .16s ease; }
+    .booking-back:hover { color: white; }
+    .booking-total { min-width: 11rem; border: 1px solid rgb(255 255 255 / .2); border-radius: 1rem; background: rgb(255 255 255 / .1); padding: 1rem 1.25rem; box-shadow: inset 0 1px 0 rgb(255 255 255 / .12); backdrop-filter: blur(8px); }
+    .booking-panel { border-color: #dbe3f0; box-shadow: 0 12px 30px rgb(30 41 59 / .055); }
+    .booking-panel-heading { border-bottom: 1px solid #e8eef7; background: linear-gradient(90deg, #f8faff, #fff); }
+    .booking-panel-heading > p:first-child, .booking-side-panel > p:first-child, .booking-payment > div > div > p:first-child { color: #4f46e5; }
+    .booking-leg { position: relative; }
+    .booking-leg + .booking-leg { border-color: #e8eef7; }
+    .booking-leg-price { display: inline-flex; align-items: center; border-radius: 9999px; background: #eef2ff; color: #3730a3; padding: .42rem .75rem; font-size: .875rem; font-weight: 800; }
+    .booking-stop { position: relative; overflow: hidden; border: 1px solid; border-radius: .9rem; }
+    .booking-stop::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: .28rem; }
+    .booking-stop-pickup { border-color: #99f6e4; background: linear-gradient(135deg, #f0fdfa, #fbfffe); }
+    .booking-stop-pickup::before { background: #0f766e; }
+    .booking-stop-dropoff { border-color: #fecdd3; background: linear-gradient(135deg, #fff7f8, #fffafa); }
+    .booking-stop-dropoff::before { background: #e11d48; }
+    .booking-payment { border-top-width: 4px; }
+    .booking-payment.is-paid { border-top-color: #059669; }
+    .booking-payment.is-refunded { border-top-color: #7c3aed; }
+    .booking-payment.is-attention { border-top-color: #dc2626; }
+    .booking-payment.is-pending { border-top-color: #d97706; }
+    .booking-payment-method { border: 1px solid #dbe3f0; border-radius: .9rem; background: #f8fafc; padding: 1rem; }
+    .booking-payment-method.is-cash-due { border-color: #fcd34d; background: #fffbeb; }
+    .booking-price-row { padding: .2rem 0; }
+    .booking-price-row.is-total { margin-top: .4rem; border-top: 1px solid #cbd5e1; }
+    .booking-side-panel { border-top: 3px solid #c7d2fe; }
+    .booking-vehicle-summary { border: 1px solid #dbe3f0; border-radius: .9rem; background: linear-gradient(135deg, #f8fafc, #f1f5f9); }
+    .booking-adjustment { border: 1px solid #dbe3f0; border-radius: .75rem; background: #f8fafc; }
+    .booking-danger { border: 1px solid #fecaca; border-top: 4px solid #e11d48; border-radius: 1rem; background: linear-gradient(135deg, #fff7f7, #fff); }
+
     /* Vehicle module: explicit layout keeps the server fallback and Vite build visually identical. */
     .vehicle-page-heading { align-items: flex-end; }
     .vehicle-toolbar { display: flex; align-items: center; justify-content: space-between; }

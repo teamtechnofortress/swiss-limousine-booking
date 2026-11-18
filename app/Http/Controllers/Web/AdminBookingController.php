@@ -73,12 +73,19 @@ final class AdminBookingController extends Controller
     public function cancel(Booking $booking, Request $request, BookingAdminService $service): RedirectResponse
     {
         $data = $request->validate([
-            'refund_gross' => ['required', 'integer', 'min:0'],
-            'reason' => ['required', 'string', 'max:500'],
+            'refund_amount' => ['required', 'regex:/^\d+(?:\.\d{1,2})?$/'],
+            'reason' => ['required', 'string', 'min:3', 'max:500'],
         ]);
-        $service->cancel($booking->id, (int) $data['refund_gross'], $data['reason'], $request->user());
+        $service->cancel($booking->id, $this->toRappen($data['refund_amount']), $data['reason'], $request->user());
 
         return redirect()->route('admin.bookings.index')->with('status', 'Booking cancelled.');
+    }
+
+    private function toRappen(string $amount): int
+    {
+        [$francs, $rappen] = array_pad(explode('.', $amount, 2), 2, '');
+
+        return ((int) $francs * 100) + (int) str_pad($rappen, 2, '0');
     }
 
     public function markPaid(Booking $booking, Request $request, PaymentService $payments): RedirectResponse
