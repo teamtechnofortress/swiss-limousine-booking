@@ -28,9 +28,12 @@ final class AdminVehicleController extends Controller
     {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
-            'status' => ['nullable', 'in:active,inactive'],
+            'status' => ['nullable', 'in:active,inactive,all'],
             'category_id' => ['nullable', 'integer', 'exists:vehicle_categories,id'],
         ]);
+        if (! $request->has('status')) {
+            $filters['status'] = 'active';
+        }
         $vehicles = Vehicle::query()->with(['category.media', 'media'])
             ->when($filters['q'] ?? null, function ($query, string $term): void {
                 $term = '%'.addcslashes($term, '%_\\').'%';
@@ -44,7 +47,7 @@ final class AdminVehicleController extends Controller
         return view('admin.vehicles.index', [
             'vehicles' => $vehicles,
             'filters' => $filters,
-            'canReorder' => empty($filters['q']) && empty($filters['status']) && empty($filters['category_id']),
+            'canReorder' => empty($filters['q']) && ($filters['status'] ?? null) === 'all' && empty($filters['category_id']),
             'filterCategories' => VehicleCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
         ]);
     }
@@ -75,6 +78,16 @@ final class AdminVehicleController extends Controller
         $this->vehicles->update($vehicle, $request->validated(), $request->user());
 
         return back()->with('status', 'Vehicle details saved.');
+    }
+
+    public function publication(Vehicle $vehicle, Request $request): RedirectResponse
+    {
+        $data = $request->validate(['is_active' => ['required', 'boolean']]);
+        $isActive = (bool) $data['is_active'];
+
+        $this->vehicles->update($vehicle, ['is_active' => $isActive], $request->user());
+
+        return back()->with('status', $isActive ? 'Vehicle published.' : 'Vehicle unpublished.');
     }
 
     public function reorder(Request $request): RedirectResponse

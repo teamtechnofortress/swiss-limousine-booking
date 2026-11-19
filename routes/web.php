@@ -60,6 +60,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
             Route::get('trips', [AdminTripController::class, 'index'])->name('trips.index');
             Route::get('trips/create', [AdminTripController::class, 'create'])->name('trips.create');
             Route::post('trips', [AdminTripController::class, 'store'])->name('trips.store');
+            Route::put('trips/reorder', [AdminTripController::class, 'reorder'])->name('trips.reorder');
             Route::get('trips/{trip}/edit', [AdminTripController::class, 'edit'])->name('trips.edit');
             Route::patch('trips/{trip}', [AdminTripController::class, 'update'])->name('trips.update');
             Route::delete('trips/{trip}', [AdminTripController::class, 'destroy'])->name('trips.destroy');
@@ -90,6 +91,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
             Route::get('vehicles/create', [AdminVehicleController::class, 'create'])->name('vehicles.create');
             Route::post('vehicles', [AdminVehicleController::class, 'store'])->name('vehicles.store');
             Route::put('vehicles/reorder', [AdminVehicleController::class, 'reorder'])->name('vehicles.reorder');
+            Route::put('vehicles/{vehicle}/publication', [AdminVehicleController::class, 'publication'])->name('vehicles.publication');
             Route::get('vehicles/{vehicle}/edit', [AdminVehicleController::class, 'edit'])->name('vehicles.edit');
             Route::patch('vehicles/{vehicle}', [AdminVehicleController::class, 'update'])->name('vehicles.update');
             Route::delete('vehicles/{vehicle}', [AdminVehicleController::class, 'destroy'])->name('vehicles.destroy');

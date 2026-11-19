@@ -62,11 +62,14 @@
                             </div>
                         </div>
 
-                        <div class="rounded-xl bg-slate-950 p-4 text-white">
-                            <p class="text-xs font-bold uppercase tracking-[.14em] text-amber-300">Stripe settlement</p>
-                            <p class="mt-2 text-2xl font-bold">{{ $currency }} {{ number_format($stripe['net'] / 100, 2) }}</p>
-                            <p class="mt-1 text-sm text-slate-400">Actual provider balance movement from synced Stripe charges and refunds.</p>
-                            <div class="mt-4 border-t border-slate-700 pt-3 text-sm"><div class="flex justify-between gap-3"><span class="text-slate-400">Settled payments</span><span class="font-bold">{{ $stripe['settled_payment_count'] }}</span></div>@if ($stripe['pending_ledger_count'] > 0)<div class="mt-2 flex justify-between gap-3 text-amber-200"><span>Ledger pending</span><span class="font-bold">{{ $stripe['pending_ledger_count'] }}</span></div>@endif</div>
+                        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <div class="flex items-start justify-between gap-3">
+                                <div><p class="text-sm font-bold text-slate-900">Stripe settlement</p><p class="mt-1 text-xs text-slate-500">Provider ledger</p></div>
+                                <span class="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">Stripe</span>
+                            </div>
+                            <p class="mt-4 text-2xl font-bold tracking-tight text-slate-950">{{ $currency }} {{ number_format($stripe['net'] / 100, 2) }}</p>
+                            <p class="mt-1 text-sm leading-5 text-slate-500">Actual balance movement after synced charges, fees, and refunds.</p>
+                            <div class="mt-4 grid gap-3 border-t border-slate-100 pt-3 text-sm sm:grid-cols-2"><div><p class="text-xs font-medium text-slate-500">Settled payments</p><p class="mt-1 font-bold text-slate-900">{{ $stripe['settled_payment_count'] }}</p></div>@if ($stripe['pending_ledger_count'] > 0)<div><p class="text-xs font-medium text-amber-700">Ledger pending</p><p class="mt-1 font-bold text-amber-800">{{ $stripe['pending_ledger_count'] }}</p></div>@endif</div>
                         </div>
                     </div>
                 </section>
@@ -74,7 +77,7 @@
 
             @foreach ($financialOverview['stripe'] as $currency => $stripe)
                 @continue(array_key_exists($currency, $financialOverview['currencies']))
-                <section class="p-5"><div class="rounded-xl bg-slate-950 p-4 text-white"><p class="text-xs font-bold uppercase tracking-[.14em] text-amber-300">Stripe settlement · {{ $currency }}</p><p class="mt-2 text-2xl font-bold">{{ $currency }} {{ number_format($stripe['net'] / 100, 2) }}</p><p class="mt-1 text-sm text-slate-400">Settlement is shown separately because Stripe settled it in a different currency.</p></div></section>
+                <section class="p-5"><div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div class="flex items-start justify-between gap-3"><div><p class="text-sm font-bold text-slate-900">Stripe settlement · {{ $currency }}</p><p class="mt-1 text-xs text-slate-500">Provider ledger</p></div><span class="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">Stripe</span></div><p class="mt-4 text-2xl font-bold tracking-tight text-slate-950">{{ $currency }} {{ number_format($stripe['net'] / 100, 2) }}</p><p class="mt-1 text-sm leading-5 text-slate-500">Shown separately because Stripe settled it in a different currency.</p></div></section>
             @endforeach
         </div>
     </section>

@@ -36,9 +36,16 @@ final class AdminTripController extends Controller
 
     public function index(Request $request): View
     {
-        $filters = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'status' => ['nullable', 'in:draft,published,archived']]);
-        $trips = Trip::query()->with('media')->withCount(['departures', 'prices'])->when($filters['q'] ?? null, fn ($q, $term) => $q->where('title', 'like', '%'.addcslashes($term, '%_\\').'%'))->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))->orderBy('sort_order')->orderBy('title')->get();
-        return view('admin.trips.index', compact('trips', 'filters'));
+        $filters = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'status' => ['nullable', 'in:all,draft,published,archived']]);
+        if (! $request->has('status')) {
+            $filters['status'] = 'published';
+        }
+        $trips = Trip::query()->with('media')->withCount(['departures', 'prices'])->when($filters['q'] ?? null, fn ($q, $term) => $q->where('title', 'like', '%'.addcslashes($term, '%_\\').'%'))->when(in_array($filters['status'] ?? null, ['draft', 'published', 'archived'], true), fn ($q) => $q->where('status', $filters['status']))->orderBy('sort_order')->orderBy('title')->get();
+        return view('admin.trips.index', [
+            'trips' => $trips,
+            'filters' => $filters,
+            'canReorder' => empty($filters['q']) && in_array($filters['status'] ?? null, ['all', 'published'], true),
+        ]);
     }
     public function create(): View { return view('admin.trips.create'); }
     public function store(Request $request): RedirectResponse { $trip = $this->trips->create($this->overview($request)); return redirect()->route('admin.trips.edit', $trip)->with('status', 'Trip draft created. Complete each checklist item before publishing.'); }
@@ -54,6 +61,18 @@ final class AdminTripController extends Controller
         ]);
     }
     public function update(Trip $trip, Request $request): RedirectResponse { $this->trips->update($trip, $this->overview($request)); return $this->stepRedirect($trip, $request)->with('status', 'Trip overview saved.'); }
+
+    public function reorder(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['trip_ids' => ['required', 'array', 'min:1'], 'trip_ids.*' => ['required', 'integer']]);
+        try {
+            $this->trips->reorder($data['trip_ids'], $request->user());
+        } catch (RuntimeException $e) {
+            return back()->withErrors(['trip_ids' => $e->getMessage()]);
+        }
+
+        return back()->with('status', 'Trip display order saved.');
+    }
 
     public function destroy(Trip $trip): RedirectResponse
     {
@@ -427,7 +446,7 @@ final class AdminTripController extends Controller
     public function blackouts(Trip $trip, Request $request): RedirectResponse { $this->trips->replaceBlackouts($trip, $this->rows($request, 'blackouts', ['date' => ['required','date'], 'reason' => ['nullable','string','max:255']])); return $this->stepRedirect($trip, $request)->with('status', 'Blackout dates saved.'); }
     public function pickupDurations(Trip $trip, Request $request): RedirectResponse { try { $data = $request->validate(['pickup_durations' => ['required','array'], 'pickup_durations.*' => ['required','integer','min:1','max:1440']]); $this->trips->replacePickupDurations($trip, collect($data['pickup_durations'])->mapWithKeys(fn ($duration, $id) => [(int) $id => (int) $duration])->all()); } catch (RuntimeException $e) { return $this->stepRedirect($trip, $request)->withErrors(['durations' => $e->getMessage()]); } return $this->stepRedirect($trip, $request)->with('status', 'Pickup durations saved.'); }
     public function locations(Trip $trip, Request $request): RedirectResponse { try { $data = $request->validate(['pickup_locations_only' => ['nullable','boolean'], 'pickup_location_ids' => ['nullable','array'], 'pickup_location_ids.*' => ['integer','distinct','exists:locations,id'], 'main_destination_location_id' => ['nullable','integer','exists:locations,id'], 'stop_location_ids' => ['nullable','array'], 'stop_location_ids.*' => ['integer','distinct','exists:locations,id']]); $trip->update(['pickup_locations_only' => (bool) ($data['pickup_locations_only'] ?? false), 'meeting_point_required' => false]); $this->trips->replaceLocations($trip, $data); } catch (RuntimeException $e) { return $this->stepRedirect($trip, $request)->withErrors(['locations' => $e->getMessage()]); } return $this->stepRedirect($trip, $request)->with('status', 'Trip locations and pickup rule saved.'); }
-    public function status(Trip $trip, Request $request): RedirectResponse { $action = $request->validate(['action' => ['required','in:publish,unpublish,archive']])['action']; try { if ($action === 'publish') $this->trips->publish($trip); elseif ($action === 'archive') { if (Booking::query()->where('trip_id', $trip->id)->whereIn('status', ['confirmed','assigned','in_progress'])->whereHas('legs', fn ($q) => $q->where('starts_at', '>', now()))->exists()) throw new RuntimeException('This trip has future confirmed bookings and cannot be archived.'); $trip->update(['status' => 'archived']); } else $trip->update(['status' => 'draft']); } catch (RuntimeException $e) { return $this->stepRedirect($trip, $request)->withErrors(['status' => $e->getMessage()]); } return $this->stepRedirect($trip, $request)->with('status', 'Trip status updated.'); }
+    public function status(Trip $trip, Request $request): RedirectResponse { $data = $request->validate(['action' => ['required','in:publish,unpublish,archive'], 'return_to_list' => ['nullable','boolean']]); $redirect = $request->boolean('return_to_list') ? back() : $this->stepRedirect($trip, $request); try { if ($data['action'] === 'publish') $this->trips->publish($trip); elseif ($data['action'] === 'archive') { if (Booking::query()->where('trip_id', $trip->id)->whereIn('status', ['confirmed','assigned','in_progress'])->whereHas('legs', fn ($q) => $q->where('starts_at', '>', now()))->exists()) throw new RuntimeException('This trip has future confirmed bookings and cannot be archived.'); $trip->update(['status' => 'archived']); } else $trip->update(['status' => 'draft']); } catch (RuntimeException $e) { return $redirect->withErrors(['status' => $e->getMessage()]); } return $redirect->with('status', 'Trip status updated.'); }
     public function cover(Trip $trip, Request $request): RedirectResponse|JsonResponse { $request->validate(['cover' => ['required','image','mimes:jpg,jpeg,png,webp','max:10240']]); $trip->addMediaFromRequest('cover')->toMediaCollection('cover'); return $this->mediaResponse($trip, $request, 'Trip cover saved.'); }
     public function gallery(Trip $trip, Request $request): RedirectResponse|JsonResponse { $request->validate(['images' => ['required','array','min:1','max:20'], 'images.*' => ['required','image','mimes:jpg,jpeg,png,webp','max:10240']]); foreach ($request->file('images', []) as $image) $trip->addMedia($image)->toMediaCollection('gallery'); return $this->mediaResponse($trip, $request, 'Trip gallery images uploaded.'); }
     public function reorderGallery(Trip $trip, Request $request): RedirectResponse|JsonResponse { $data = $request->validate(['media_ids' => ['required','array'], 'media_ids.*' => ['required','integer','distinct']]); $ids = array_map('intval', $data['media_ids']); $ownedIds = $trip->getMedia('gallery')->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all(); $sortedIds = collect($ids)->sort()->values()->all(); if (count($ids) !== count($ownedIds) || $sortedIds !== $ownedIds) throw ValidationException::withMessages(['media_ids' => 'The gallery order must include every gallery image exactly once.']); Media::setNewOrder($ids); return $this->mediaResponse($trip, $request, 'Gallery order saved.'); }

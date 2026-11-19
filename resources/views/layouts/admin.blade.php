@@ -20,8 +20,8 @@
         </a>
         <nav class="space-y-1 text-sm">
             <x-admin.nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')" icon="grid">Overview</x-admin.nav-link>
-            @can('bookings.view')<x-admin.nav-link :href="route('admin.bookings.index')" :active="request()->routeIs('admin.bookings.*')" icon="calendar">Bookings</x-admin.nav-link>@endcan
-            @can('enquiries.view')<x-admin.nav-link :href="route('admin.enquiries.index')" :active="request()->routeIs('admin.enquiries.*')" icon="mail">Enquiries</x-admin.nav-link>@endcan
+            @can('bookings.view')<x-admin.nav-link :href="route('admin.bookings.index')" :active="request()->routeIs('admin.bookings.*')" :badge="$navCounts['bookings']" badge-label="unseen bookings" icon="calendar">Bookings</x-admin.nav-link>@endcan
+            @can('enquiries.view')<x-admin.nav-link :href="route('admin.enquiries.index')" :active="request()->routeIs('admin.enquiries.*')" :badge="$navCounts['enquiries']" badge-label="unread enquiries" icon="mail">Enquiries</x-admin.nav-link>@endcan
             @can('payments.view')<x-admin.nav-link :href="route('admin.payments.index')" :active="request()->routeIs('admin.payments.*')" icon="card">Payments</x-admin.nav-link>@endcan
             <p class="px-3 pt-7 pb-2 text-[10px] font-bold uppercase tracking-[.18em] text-slate-600">Configuration</p>
             @can('fleet.manage')<x-admin.nav-link :href="route('admin.vehicles.index')" :active="request()->routeIs('admin.vehicles.*')" icon="car">Vehicles</x-admin.nav-link>@endcan

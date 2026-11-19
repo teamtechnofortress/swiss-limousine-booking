@@ -6,6 +6,7 @@ use App\Models\Trip;
 use App\Models\TripPrice;
 use App\Models\TripLocation;
 use App\Models\Location;
+use App\Models\User;
 use App\Models\Vehicle;
 use App\Services\Settings\SettingsService;
 use Illuminate\Support\Facades\DB;
@@ -29,6 +30,27 @@ final class TripManager
     {
         $trip->fill([...$data, 'slug' => isset($data['slug']) ? $this->uniqueSlug($data['slug'], $trip->id) : $trip->slug])->save();
         return $trip;
+    }
+
+    /** @param list<int|string> $orderedIds */
+    public function reorder(array $orderedIds, ?User $actor): void
+    {
+        $ids = array_map('intval', $orderedIds);
+        if (count($ids) !== count(array_unique($ids))) {
+            throw new RuntimeException('Each trip may appear only once in the display order.');
+        }
+
+        if (Trip::query()->whereIn('id', $ids)->count() !== count($ids)) {
+            throw new RuntimeException('One or more trips no longer exist. Refresh the list and try again.');
+        }
+
+        DB::transaction(function () use ($ids, $actor): void {
+            foreach ($ids as $index => $id) {
+                Trip::query()->whereKey($id)->update(['sort_order' => $index + 1]);
+            }
+
+            activity('trips')->causedBy($actor)->withProperties(['trip_ids' => $ids])->log('trips_reordered');
+        });
     }
 
     /** @param list<array<string, mixed>> $rows */

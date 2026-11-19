@@ -4,6 +4,13 @@
         @if($group === 'integrations' && auth()->user()->can('integrations.manage'))<a href="{{ route('admin.mail.show') }}" class="admin-button-soft">Mail delivery →</a>@endif
     </div>
 
+    @if($group === 'security')
+        <section class="mb-6 rounded-2xl border border-blue-100 bg-blue-50/60 px-5 py-4">
+            <p class="font-bold text-slate-900">Cloudflare Turnstile</p>
+            <p class="mt-1 text-sm leading-6 text-slate-600">Manage bot protection for customer quote, enquiry, and booking forms. Keep the secret key private; it is stored encrypted.</p>
+        </section>
+    @endif
+
     <form method="POST" action="{{ route('admin.settings.update', $group) }}" class="admin-card divide-y divide-slate-100 overflow-hidden">
         @csrf
         @method('PUT')

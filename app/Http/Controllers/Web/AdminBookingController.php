@@ -25,6 +25,13 @@ final class AdminBookingController extends Controller
             'trip_id' => ['nullable', 'integer', 'exists:trips,id'],
         ]);
 
+        // Confirmed bookings are the operational default. An explicit blank
+        // status still means “All statuses”, and the unseen shortcut keeps
+        // its wider queue of confirmed and needs-review bookings.
+        if (! $request->has('status') && ! $request->boolean('unseen')) {
+            $filters['status'] = BookingStatus::Confirmed->value;
+        }
+
         $selectedTrip = isset($filters['trip_id'])
             ? Trip::query()->withTrashed()->find((int) $filters['trip_id'])
             : null;

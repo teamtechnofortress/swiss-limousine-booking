@@ -117,4 +117,21 @@ final class MailSettingsTest extends TestCase
         ])->assertRedirect('/admin/settings/integrations')
             ->assertSessionHasNoErrors();
     }
+
+    public function test_web_settings_save_turnstile_configuration_from_security_group(): void
+    {
+        $this->actingAs($this->user('super_admin'));
+
+        $this->put('/admin/settings/security', [
+            'settings' => [
+                'turnstile_enabled' => '1',
+                'turnstile_site_key' => '1x00000000000000000000AA',
+                'turnstile_secret_key' => '1x0000000000000000000000000000000AA',
+            ],
+        ])->assertRedirect('/admin/settings/security')
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('1x00000000000000000000AA', Setting::query()->where('key', 'turnstile_site_key')->value('value'));
+        $this->assertNotSame('1x0000000000000000000000000000000AA', Setting::query()->where('key', 'turnstile_secret_key')->value('value'));
+    }
 }

@@ -31,8 +31,6 @@ final class SettingsSeeder extends Seeder
             'stripe_webhook_secret' => $this->def('integrations', 'secret', '', 'Signing secret that proves a webhook came from Stripe. Encrypted.', true, $integrations),
             'google_browser_key' => $this->def('integrations', 'string', '', 'Google key for Places Autocomplete in the browser. Restrict to your domains.', false, $integrations),
             'google_server_key' => $this->def('integrations', 'secret', '', 'Google key used by Laravel for Place Details and Routes. Restrict to server IPs. Encrypted.', true, $integrations),
-            'turnstile_site_key' => $this->def('integrations', 'string', '', 'Cloudflare Turnstile site key used in the customer browser. This is safe to publish.', false, $integrations),
-            'turnstile_secret_key' => $this->def('integrations', 'secret', '', 'Cloudflare Turnstile secret for bot checks. Encrypted.', true, $integrations),
             'mail_mailer' => $this->def('integrations', 'string', 'smtp', 'Email transport: smtp for production, log to write emails to the log file for local testing.', false, $integrations),
             'smtp_host' => $this->def('integrations', 'string', '', 'SMTP server host name, for example smtp.provider.ch.', false, $integrations),
             'smtp_port' => $this->def('integrations', 'int', '587', 'SMTP port: 587 for STARTTLS, 465 for SSL.', false, $integrations),
@@ -95,6 +93,8 @@ final class SettingsSeeder extends Seeder
 
             // Quote and booking security
             'turnstile_enabled' => $this->def('security', 'bool', '1', 'Requires a bot check on quote and booking requests. Turn off only in local development.', false, 'integrations.manage'),
+            'turnstile_site_key' => $this->def('security', 'string', '', 'Cloudflare Turnstile site key used in the customer browser. This is safe to publish.', false, 'integrations.manage'),
+            'turnstile_secret_key' => $this->def('security', 'secret', '', 'Cloudflare Turnstile secret for bot checks. Encrypted.', true, 'integrations.manage'),
 
             // Company
             'site_name' => $this->def('company', 'string', 'Swiss Limousine', 'Name shown in the public website header, browser title and customer-facing pages.', false, 'company.manage'),

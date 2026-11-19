@@ -62,6 +62,12 @@
     .vehicle-list-header { display: none; }
     .vehicle-index #vehicle-list > article { transition: background-color .18s ease; }
     .vehicle-index #vehicle-list > article:hover { background: #fbfcff; }
+    .trip-drag-handle { cursor: grab; }
+    .trip-drag-handle:active { cursor: grabbing; }
+    #trip-list > article[data-trip-row] { transition: background-color .18s ease, opacity .18s ease; }
+    #trip-list > article[data-trip-row]:hover { background: #fbfcff; }
+    #trip-list > article[data-trip-row][data-dragging="true"] { opacity: .45; }
+    #trip-list > article[data-trip-row][data-drag-over="true"] { box-shadow: inset 3px 0 0 var(--color-indigo-500); }
     .vehicle-editor [data-vehicle-wizard] { overflow-x: auto; padding-bottom: .25rem; }
     .vehicle-editor [data-vehicle-wizard] button { white-space: nowrap; }
     .vehicle-editor [data-vehicle-panel] { min-height: 31rem; }
@@ -94,16 +100,16 @@
     [data-trip-rich-editor] blockquote { margin: 1rem 0; border-left: 3px solid var(--color-indigo-400); padding-left: 1rem; color: var(--color-slate-600); font-style: italic; }
     [data-trip-rich-editor] a { color: var(--color-indigo-700); text-decoration: underline; text-underline-offset: 3px; }
 
-    @media (min-width: 1024px) {
+    @media (min-width: 1280px) {
         .vehicle-index #vehicle-list > article,
         .vehicle-index .vehicle-list-header {
             display: grid;
-            grid-template-columns: 32px minmax(280px, 1.5fr) minmax(130px, .7fr) minmax(150px, .8fr) 130px 96px;
+            grid-template-columns: 32px minmax(280px, 1.5fr) minmax(130px, .7fr) 130px 180px;
             gap: 1.25rem;
             align-items: center;
         }
         .vehicle-index .vehicle-list-header { display: grid; }
-        .vehicle-index #vehicle-list > article > div:first-of-type { display: block; }
+        .vehicle-index #vehicle-list .vehicle-drag-handle { display: block; }
         .vehicle-index #vehicle-list .size-16 { width: 4rem; height: 4rem; }
         .vehicle-editor form[data-vehicle-form] { display: grid; grid-template-columns: minmax(0, 1fr) 290px; align-items: start; }
         .vehicle-editor form[data-vehicle-form] > aside { position: sticky; top: 6rem; }

@@ -30,16 +30,16 @@ final class AdminSettingsController extends Controller
 
     /** @var array<string, string> */
     private const GROUP_LABELS = [
+        'company' => 'Company & notifications',
         'integrations' => 'Integrations',
         'payment_methods' => 'Payment methods',
         'service_area' => 'Service area',
-        'locations' => 'Locations & routes',
+        // 'locations' => 'Locations & routes',
         'availability' => 'Availability',
         'tax' => 'Tax & currency',
-        'pricing' => 'Pricing & quotes',
+        // 'pricing' => 'Pricing & quotes',
         'bookings' => 'Booking rules',
         'security' => 'Security',
-        'company' => 'Company & notifications',
     ];
 
     public function __construct(
@@ -104,6 +104,14 @@ final class AdminSettingsController extends Controller
         }
         if ($group === 'company') {
             $order = ['site_name' => 0, 'site_logo_url' => 10];
+            $settings = $settings->sortBy(fn (Setting $setting): int => $order[$setting->key] ?? 100)->values();
+        }
+        if ($group === 'security') {
+            $order = [
+                'turnstile_enabled' => 0,
+                'turnstile_site_key' => 10,
+                'turnstile_secret_key' => 20,
+            ];
             $settings = $settings->sortBy(fn (Setting $setting): int => $order[$setting->key] ?? 100)->values();
         }
 
