@@ -32,6 +32,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::post('bookings/{booking}/assign', [AdminBookingController::class, 'assign'])->name('bookings.assign')->middleware('can:bookings.assign');
         Route::post('bookings/{booking}/waiting', [AdminBookingController::class, 'waiting'])->name('bookings.waiting')->middleware('can:bookings.waiting');
         Route::post('bookings/{booking}/cancel', [AdminBookingController::class, 'cancel'])->name('bookings.cancel')->middleware('can:bookings.cancel');
+        Route::post('bookings/{booking}/cancel-without-refund', [AdminBookingController::class, 'cancelWithoutRefund'])->name('bookings.cancel-without-refund')->middleware('can:bookings.cancel');
         Route::post('bookings/{booking}/mark-paid', [AdminBookingController::class, 'markPaid'])->name('bookings.mark-paid')->middleware('can:payments.mark_paid');
 
         Route::get('enquiries', [AdminEnquiryController::class, 'index'])->name('enquiries.index')->middleware('can:enquiries.view');

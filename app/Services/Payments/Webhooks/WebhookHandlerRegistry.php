@@ -22,7 +22,9 @@ final class WebhookHandlerRegistry
             'checkout.session.async_payment_failed' => $this->checkoutAsyncPaymentFailed,
             'payment_intent.succeeded' => $this->paymentIntentSucceeded,
             'payment_intent.payment_failed', 'payment_intent.canceled' => $this->paymentIntentUnsuccessful,
-            'refund.created', 'refund.updated' => $this->refundUpdated,
+            // Stripe currently delivers Refund-object updates as charge.refund.updated.
+            // Keep the unprefixed names too so the reconciler remains compatible with either event name.
+            'refund.created', 'refund.updated', 'charge.refund.updated' => $this->refundUpdated,
             'charge.refunded' => $this->chargeRefunded,
             default => null,
         };

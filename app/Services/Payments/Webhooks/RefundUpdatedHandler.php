@@ -10,6 +10,6 @@ final class RefundUpdatedHandler implements WebhookHandler
 
     public function handle(array $object): void
     {
-        $this->payments->reconcileStripeRefund($object);
+        $this->payments->reconcileStripeRefund($object, fromWebhook: true);
     }
 }

@@ -69,7 +69,8 @@ final class BookingAdminService
 
     /**
      * Cancels the booking and releases its slot. The refund runs after the commit.
-     * If the refund fails, the booking stays cancelled and the refund can be retried from the payment screen.
+     * Online refunds are requested after the cancellation commit; the booking stays cancelled while
+     * Stripe confirms the refund asynchronously.
      */
     public function cancel(int $bookingId, int $refundGross, string $reason, User $admin): Booking
     {

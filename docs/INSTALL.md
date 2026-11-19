@@ -73,6 +73,17 @@ For an existing database, add newly introduced settings without overwriting save
 php artisan db:seed --class=SettingsSeeder
 ```
 
+To erase only operational booking/payment data in a local or test environment (while keeping
+users, settings, vehicles, locations, and trips), run this explicit reset seeder:
+
+```bash
+php artisan db:seed --class=ClearBookingDataSeeder
+```
+
+Stop any queue worker first. It removes bookings, booking relations, payments, refunds, payment
+attempts, booking payment webhooks, and queued payment jobs. It is intentionally blocked outside
+`local` and `testing`.
+
 The seeder creates:
 - roles and permissions from `config/rbac.php`
 - every setting with its default (existing values are never overwritten)
@@ -127,7 +138,7 @@ php artisan queue:work database --queue=default,mail
 php artisan schedule:work
 ```
 
-- The queue worker sends emails and processes Stripe webhooks.
+- The queue worker sends emails, submits Stripe refund requests, processes Stripe webhooks, and retrieves Stripe settlement fee data after confirmed payments and refunds.
 - `schedule:work` expires unpaid holds every minute. In production, run `schedule:run` from cron instead.
 
 ## 10. Stripe webhooks (local)

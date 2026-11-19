@@ -28,7 +28,7 @@ final class PaymentController extends Controller
             'id' => $refund->id,
             'gross' => $refund->gross_amount,
             'vat' => $refund->vat_amount,
-            'status' => $refund->status,
-        ]], 201);
+            'status' => $refund->status->value,
+        ]], $refund->status === \App\Enums\RefundStatus::Pending ? 202 : 201);
     }
 }

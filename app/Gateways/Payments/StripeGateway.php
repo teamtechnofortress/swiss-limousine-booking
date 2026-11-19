@@ -3,9 +3,14 @@
 namespace App\Gateways\Payments;
 
 use App\Data\CheckoutSession;
+use App\Data\GatewayBalanceTransaction;
+use App\Data\GatewayPaymentLedger;
+use App\Data\GatewayRefund;
+use App\Data\GatewayRefundLedger;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\PaymentAttempt;
+use App\Models\Refund;
 use App\Services\Settings\SettingsService;
 use Carbon\CarbonImmutable;
 use RuntimeException;
@@ -66,14 +71,69 @@ final class StripeGateway implements PaymentGateway
         return new CheckoutSession((string) $session->id, $session->url);
     }
 
-    public function refund(Payment $payment, int $amount, string $idempotencyKey): string
+    public function refund(Payment $payment, Refund $localRefund): GatewayRefund
     {
-        $refund = $this->client()->refunds->create(
-            ['payment_intent' => $payment->provider_payment_intent, 'amount' => $amount],
-            ['idempotency_key' => $idempotencyKey],
+        if ($payment->provider_payment_intent === null) {
+            throw new RuntimeException('Cannot refund an online payment without a Stripe PaymentIntent.');
+        }
+
+        $stripeRefund = $this->client()->refunds->create(
+            [
+                'payment_intent' => $payment->provider_payment_intent,
+                'amount' => $localRefund->gross_amount,
+                'metadata' => ['limo_refund_id' => (string) $localRefund->id],
+            ],
+            ['idempotency_key' => $localRefund->idempotency_key],
         );
 
-        return (string) $refund->id;
+        $paymentIntent = $stripeRefund->payment_intent;
+
+        return new GatewayRefund(
+            id: (string) $stripeRefund->id,
+            status: (string) $stripeRefund->status,
+            paymentIntent: is_string($paymentIntent)
+                ? $paymentIntent
+                : (is_object($paymentIntent) && isset($paymentIntent->id) ? (string) $paymentIntent->id : null),
+            amount: (int) $stripeRefund->amount,
+            metadata: $stripeRefund->metadata?->toArray() ?? [],
+        );
+    }
+
+    public function retrievePaymentLedger(Payment $payment): ?GatewayPaymentLedger
+    {
+        $paymentIntentId = $payment->provider_payment_intent
+            ?? throw new RuntimeException('Cannot retrieve a payment ledger without a Stripe PaymentIntent.');
+
+        $paymentIntent = $this->client()->paymentIntents->retrieve(
+            $paymentIntentId,
+            ['expand' => ['latest_charge.balance_transaction']],
+        );
+
+        $charge = $paymentIntent->latest_charge;
+        if (is_string($charge)) {
+            $charge = $this->client()->charges->retrieve($charge, ['expand' => ['balance_transaction']]);
+        }
+
+        if (! is_object($charge) || ! isset($charge->id)) {
+            return null;
+        }
+
+        $balanceTransaction = $this->retrieveBalanceTransaction($charge->balance_transaction ?? null);
+
+        return $balanceTransaction === null
+            ? null
+            : new GatewayPaymentLedger((string) $charge->id, $balanceTransaction);
+    }
+
+    public function retrieveRefundLedger(Refund $refund): ?GatewayRefundLedger
+    {
+        $refundId = $refund->provider_reference
+            ?? throw new RuntimeException('Cannot retrieve a refund ledger without a Stripe refund ID.');
+
+        $stripeRefund = $this->client()->refunds->retrieve($refundId, ['expand' => ['balance_transaction']]);
+        $balanceTransaction = $this->retrieveBalanceTransaction($stripeRefund->balance_transaction ?? null);
+
+        return $balanceTransaction === null ? null : new GatewayRefundLedger($balanceTransaction);
     }
 
     public function parseWebhook(string $payload, string $signature): array
@@ -103,6 +163,32 @@ final class StripeGateway implements PaymentGateway
     {
         return $this->settings->secret('stripe_webhook_secret')
             ?? throw new RuntimeException('Stripe webhook secret is not configured.');
+    }
+
+    private function retrieveBalanceTransaction(mixed $value): ?GatewayBalanceTransaction
+    {
+        if (is_string($value) && $value !== '') {
+            $value = $this->client()->balanceTransactions->retrieve($value);
+        }
+
+        if (! is_object($value) || ! isset($value->id, $value->amount, $value->currency, $value->fee, $value->net)) {
+            return null;
+        }
+
+        $feeDetails = $value->fee_details ?? [];
+        if (is_object($feeDetails) && method_exists($feeDetails, 'toArray')) {
+            $feeDetails = $feeDetails->toArray();
+        }
+
+        return new GatewayBalanceTransaction(
+            id: (string) $value->id,
+            amount: (int) $value->amount,
+            currency: strtoupper((string) $value->currency),
+            feeAmount: (int) $value->fee,
+            feeDetails: is_array($feeDetails) ? array_values($feeDetails) : [],
+            netAmount: (int) $value->net,
+            exchangeRate: isset($value->exchange_rate) ? (string) $value->exchange_rate : null,
+        );
     }
 
     private function frontendUrl(string $path): string

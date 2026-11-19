@@ -5,6 +5,11 @@
         $isCashOnArrival = $payment?->method === \App\Enums\PaymentMethod::CashOnArrival;
         $isOfflinePayment = $payment && $payment->method !== \App\Enums\PaymentMethod::Online;
         $canCancel = $booking->status->canTransitionTo(\App\Enums\BookingStatus::Cancelled);
+        $refunded = $payment ? (int) $payment->refunds->where('status', \App\Enums\RefundStatus::Succeeded)->sum('gross_amount') : 0;
+        $reserved = $payment ? (int) $payment->refunds->whereIn('status', [\App\Enums\RefundStatus::Pending, \App\Enums\RefundStatus::RequiresAction])->sum('gross_amount') : 0;
+        $availableToRefund = $payment ? max(0, $payment->gross_amount - $refunded - $reserved) : 0;
+        $stripeFee = $payment?->provider_ledger_synced_at ? min((int) $payment->provider_fee_amount, $availableToRefund) : 0;
+        $canRefund = $payment && in_array($payment->status, [\App\Enums\PaymentStatus::Paid, \App\Enums\PaymentStatus::PartiallyRefunded], true) && $availableToRefund > 0;
         $paymentVisualState = match ($payment?->status) {
             \App\Enums\PaymentStatus::Paid => 'is-paid',
             \App\Enums\PaymentStatus::Refunded, \App\Enums\PaymentStatus::PartiallyRefunded => 'is-refunded',
@@ -33,6 +38,21 @@
             <p class="text-xs font-bold uppercase tracking-[.13em] text-indigo-200">Booking total</p>
             <p class="mt-1 text-2xl font-bold text-white">{{ $currency }} {{ number_format($booking->total_amount / 100, 2) }}</p>
         </div>
+
+        @if ($canCancel || $canRefund)
+            <div class="relative z-10 flex w-full flex-wrap gap-2 border-t border-white/15 pt-4 sm:justify-end">
+                @can('payments.refund')
+                    @if ($canRefund)
+                        <button type="button" data-refund-open="refund-modal-{{ $payment->id }}" class="rounded-lg bg-rose-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-rose-700">Refund payment</button>
+                    @endif
+                @endcan
+                @can('bookings.cancel')
+                    @if ($canCancel)
+                        <button type="button" data-booking-cancel-open="booking-cancel-modal-{{ $booking->id }}" class="rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/20">Cancel booking</button>
+                    @endif
+                @endcan
+            </div>
+        @endif
     </section>
 
     <div class="booking-detail-grid grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,1fr)]">
@@ -130,15 +150,33 @@
                     </div>
                 </dl>
 
+                @if ($payment?->provider_ledger_synced_at)
+                    <div class="mt-5 border-t border-slate-100 pt-5">
+                        <p class="admin-label">Stripe settlement</p>
+                        <dl class="mt-3 space-y-2 text-sm">
+                            <div class="flex justify-between gap-5"><dt class="text-slate-500">Balance amount</dt><dd class="font-semibold text-slate-800">{{ $payment->provider_balance_currency }} {{ number_format($payment->provider_balance_amount / 100, 2) }}</dd></div>
+                            <div class="flex justify-between gap-5"><dt class="text-slate-500">Stripe processing fee</dt><dd class="font-semibold text-slate-800">{{ $payment->provider_balance_currency }} {{ number_format($payment->provider_fee_amount / 100, 2) }}</dd></div>
+                            <div class="flex justify-between gap-5"><dt class="text-slate-500">Stripe net</dt><dd class="font-semibold text-slate-800">{{ $payment->provider_balance_currency }} {{ number_format($payment->provider_net_amount / 100, 2) }}</dd></div>
+                            @if ($payment->provider_exchange_rate)<div class="flex justify-between gap-5"><dt class="text-slate-500">Exchange rate</dt><dd class="font-semibold text-slate-800">{{ $payment->provider_exchange_rate }}</dd></div>@endif
+                        </dl>
+                    </div>
+                @endif
+
                 @if ($payment?->refunds->isNotEmpty())
                     <div class="mt-5 border-t border-slate-100 pt-5">
                         <p class="admin-label">Refunds</p>
                         <div class="mt-3 space-y-2">
                             @foreach ($payment->refunds as $refund)
                                 <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
-                                    <span class="text-slate-600">{{ str($refund->status)->replace('_', ' ')->title() }}{{ $refund->reason ? ' · '.$refund->reason : '' }}</span>
+                                    <span class="text-slate-600">{{ str($refund->status->value)->replace('_', ' ')->title() }}{{ $refund->reason ? ' · '.$refund->reason : '' }}</span>
                                     <span class="font-semibold text-slate-800">{{ $currency }} {{ number_format($refund->gross_amount / 100, 2) }}</span>
                                 </div>
+                                @if ($refund->cancel_booking_on_success)
+                                    <p class="text-xs {{ $refund->booking_cancelled_at ? 'text-emerald-700' : 'text-slate-500' }}">{{ $refund->booking_cancelled_at ? 'Booking cancelled after Stripe confirmation.' : 'Booking will be cancelled after Stripe confirms this refund.' }}</p>
+                                @endif
+                                @if ($refund->provider_ledger_synced_at)
+                                    <p class="text-xs text-slate-500">Stripe net: {{ $refund->provider_balance_currency }} {{ number_format($refund->provider_net_amount / 100, 2) }} · fee: {{ $refund->provider_balance_currency }} {{ number_format($refund->provider_fee_amount / 100, 2) }}</p>
+                                @endif
                             @endforeach
                         </div>
                     </div>
@@ -206,61 +244,41 @@
                 @endcan
             </article>
 
-            <article class="admin-card booking-panel booking-side-panel p-6">
-                <p class="text-xs font-bold uppercase tracking-[.13em] text-indigo-600">Journey changes</p>
-                <h3 class="mt-1 text-lg font-bold text-slate-900">Waiting time and adjustments</h3>
 
-                @if ($booking->adjustments->isNotEmpty())
-                    <div class="mt-5 space-y-3">
-                        @foreach ($booking->adjustments as $adjustment)
-                            <div class="booking-adjustment flex justify-between gap-4 p-3 text-sm">
-                                <span class="text-slate-600">{{ str($adjustment->type)->title() }} · {{ $adjustment->minutes }} min</span>
-                                <span class="shrink-0 font-semibold text-slate-800">{{ $currency }} {{ number_format($adjustment->gross_amount / 100, 2) }}</span>
-                            </div>
-                        @endforeach
-                    </div>
-                @else
-                    <p class="mt-4 text-sm text-slate-500">No journey adjustments have been recorded.</p>
-                @endif
 
-                @can ('bookings.waiting')
-                    <form class="mt-5 border-t border-slate-100 pt-5" method="POST" action="{{ route('admin.bookings.waiting', $booking) }}">
-                        @csrf
-                        <label class="admin-label" for="minutes">Add waiting time</label>
-                        <div class="mt-2 flex gap-2">
-                            <input id="minutes" class="admin-input !mt-0" type="number" min="1" name="minutes" placeholder="Minutes" required>
-                            <button class="admin-button">Add</button>
-                        </div>
-                    </form>
-                @endcan
-            </article>
 
-            @can ('bookings.cancel')
-                @if ($canCancel)
-                    <article class="booking-danger p-6">
-                        <p class="text-xs font-bold uppercase tracking-[.13em] text-rose-700">Booking management</p>
-                        <h3 class="mt-1 text-lg font-bold text-slate-900">Cancel this booking</h3>
-                        <p class="mt-2 text-sm leading-6 text-slate-600">Use only after confirming the cancellation and any refund amount with the customer.</p>
-
-                        <details class="mt-4">
-                            <summary class="cursor-pointer text-sm font-semibold text-rose-700 hover:text-rose-900">Start cancellation</summary>
-                            <form class="mt-4 space-y-3" method="POST" action="{{ route('admin.bookings.cancel', $booking) }}">
-                                @csrf
-                                <div>
-                                    <label class="admin-label" for="refund_amount">Refund amount ({{ $currency }})</label>
-                                    <input id="refund_amount" class="admin-input !mt-1" name="refund_amount" type="number" min="0" step="0.01" value="0.00" inputmode="decimal" required>
-                                </div>
-                                <div>
-                                    <label class="admin-label" for="cancellation_reason">Cancellation reason</label>
-                                    <textarea id="cancellation_reason" class="admin-input !mt-1" name="reason" rows="3" required></textarea>
-                                </div>
-                                <button class="admin-button w-full !bg-rose-700 hover:!bg-rose-800">Cancel booking</button>
-                            </form>
-                        </details>
-                    </article>
-                @endif
-            @endcan
         </aside>
     </div>
+
+    @can('payments.refund')
+        @if ($canRefund)
+            @include('admin.payments._refund-modal', compact('payment', 'availableToRefund', 'reserved', 'stripeFee'))
+        @endif
+    @endcan
+
+    @can('bookings.cancel')
+        @if ($canCancel)
+            <dialog id="booking-cancel-modal-{{ $booking->id }}" class="fixed left-1/2 top-1/2 m-0 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-slate-200 bg-white p-0 shadow-2xl backdrop:bg-slate-950/55">
+                <form method="POST" action="{{ route('admin.bookings.cancel-without-refund', $booking) }}">
+                    @csrf
+                    <header class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+                        <div><p class="text-xs font-bold uppercase tracking-[.14em] text-rose-600">Cancel booking</p><h2 class="mt-1 text-lg font-bold text-slate-950">{{ $booking->reference }}</h2></div>
+                        <button type="button" data-booking-cancel-close class="grid size-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close cancellation dialog">×</button>
+                    </header>
+                    <div class="space-y-4 p-5">
+                        <p class="text-sm text-slate-600">This releases the booking’s schedule blocks and does not send a payment refund.</p>
+                        <div>
+                            <label class="admin-label" for="booking-cancel-reason-{{ $booking->id }}">Cancellation reason</label>
+                            <textarea id="booking-cancel-reason-{{ $booking->id }}" class="admin-input" required maxlength="500" name="reason" rows="3" placeholder="Reason for cancellation"></textarea>
+                        </div>
+                    </div>
+                    <footer class="flex flex-col-reverse gap-3 border-t border-slate-200 px-5 py-3 sm:flex-row sm:justify-end">
+                        <button type="button" data-booking-cancel-close class="admin-button-soft">Keep booking</button>
+                        <button class="admin-button !bg-rose-700 hover:!bg-rose-800">Cancel booking</button>
+                    </footer>
+                </form>
+            </dialog>
+        @endif
+    @endcan
     </div>
 </x-layouts.admin>

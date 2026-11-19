@@ -1,5 +1,121 @@
 import './bootstrap';
 
+document.querySelectorAll('[data-refund-modal]').forEach((dialog) => {
+    const form = dialog.querySelector('[data-refund-form]');
+    const currency = dialog.dataset.currency;
+    const available = Number(dialog.dataset.available || 0);
+    const stripeFee = Math.min(Number(dialog.dataset.stripeFee || 0), available);
+    const choices = form.querySelectorAll('[data-refund-choice]');
+    const customWrap = form.querySelector('[data-refund-custom-wrap]');
+    const custom = form.querySelector('[data-refund-custom]');
+    const includeFee = form.querySelector('[data-refund-fee]');
+    const amount = form.querySelector('[data-refund-amount]');
+    const totalOutput = form.querySelector('[data-refund-total]');
+    const submit = form.querySelector('[data-refund-submit]');
+
+    const format = (minor) => `${currency} ${(minor / 100).toLocaleString('en-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const customMinor = () => {
+        const value = Number.parseFloat(custom.value);
+        return Number.isFinite(value) && value > 0 ? Math.round(value * 100) : 0;
+    };
+
+    const serviceAmountFor = (choice) => {
+        const serviceAvailable = Math.max(0, available - stripeFee);
+
+        if (choice.value === 'percentage') {
+            return Math.round(serviceAvailable * Number(choice.dataset.refundPercentage || 0) / 100);
+        }
+
+        return serviceAvailable;
+    };
+
+    const sync = () => {
+        const choice = form.querySelector('[data-refund-choice]:checked');
+        const isCustom = choice?.value === 'custom';
+        const feeIncluded = includeFee?.checked ? stripeFee : 0;
+        // The service amount deliberately excludes the stored Stripe fee. The checkbox determines
+        // whether that fee is added back to the customer amount; Stripe itself does not return it.
+        const serviceAvailable = Math.max(0, available - stripeFee);
+        let serviceAmount = choice ? serviceAmountFor(choice) : 0;
+
+        choices.forEach((option) => {
+            if (option.value === 'custom') return;
+
+            const key = option.value === 'full' ? 'full' : `percentage-${option.dataset.refundPercentage}`;
+            const output = form.querySelector(`[data-refund-option-total="${key}"]`);
+            if (output) output.textContent = format(Math.min(available, serviceAmountFor(option) + feeIncluded));
+        });
+
+        customWrap.classList.toggle('hidden', !isCustom);
+        custom.disabled = !isCustom;
+        custom.required = isCustom;
+        custom.max = (serviceAvailable / 100).toFixed(2);
+        custom.setCustomValidity('');
+
+        if (isCustom) {
+            const requested = customMinor();
+            if (requested > serviceAvailable) {
+                custom.setCustomValidity(`The custom service refund cannot exceed ${format(serviceAvailable)}.`);
+            }
+            serviceAmount = Math.min(requested, serviceAvailable);
+        }
+
+        if (!choice) {
+            amount.value = '';
+            totalOutput.textContent = 'Choose an option';
+            submit.disabled = true;
+            submit.textContent = 'Select a refund option';
+            return;
+        }
+
+        const total = Math.min(available, serviceAmount + feeIncluded);
+        amount.value = String(total);
+        totalOutput.textContent = format(total);
+        submit.disabled = total <= 0;
+        submit.textContent = total > 0 ? `Request Stripe refund · ${format(total)}` : 'Enter a refund amount';
+    };
+
+    document.querySelectorAll(`[data-refund-open="${dialog.id}"]`).forEach((button) => {
+        button.addEventListener('click', () => {
+            form.reset();
+            choices.forEach((choice) => { choice.checked = false; });
+            if (includeFee) includeFee.checked = false;
+            custom.value = '';
+            sync();
+            dialog.showModal();
+        });
+    });
+
+    form.querySelectorAll('[data-refund-close]').forEach((button) => button.addEventListener('click', () => dialog.close()));
+    choices.forEach((choice) => choice.addEventListener('change', sync));
+    includeFee?.addEventListener('change', sync);
+    custom.addEventListener('input', sync);
+    form.addEventListener('submit', (event) => {
+        sync();
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            form.reportValidity();
+        }
+    });
+    dialog.addEventListener('click', (event) => {
+        if (event.target === dialog) dialog.close();
+    });
+    sync();
+});
+
+document.querySelectorAll('[data-booking-cancel-open]').forEach((button) => {
+    const dialog = document.getElementById(button.dataset.bookingCancelOpen);
+    if (!dialog) return;
+
+    button.addEventListener('click', () => dialog.showModal());
+    dialog.querySelectorAll('[data-booking-cancel-close]').forEach((close) => {
+        close.addEventListener('click', () => dialog.close());
+    });
+    dialog.addEventListener('click', (event) => {
+        if (event.target === dialog) dialog.close();
+    });
+});
+
 document.querySelectorAll('[data-country-picker]').forEach((picker) => {
     const search = picker.querySelector('[data-country-search]');
     const results = picker.querySelector('[data-country-results]');

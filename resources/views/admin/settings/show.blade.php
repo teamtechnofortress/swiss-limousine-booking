@@ -176,7 +176,7 @@
                     <div class="mt-3 grid gap-2 text-xs text-slate-600 md:grid-cols-2">
                         <p><span class="font-semibold text-slate-800">Checkout:</span> <code>checkout.session.completed</code>, <code>checkout.session.async_payment_succeeded</code>, <code>checkout.session.async_payment_failed</code>, <code>checkout.session.expired</code></p>
                         <p><span class="font-semibold text-slate-800">PaymentIntent:</span> <code>payment_intent.succeeded</code>, <code>payment_intent.payment_failed</code>, <code>payment_intent.canceled</code></p>
-                        <p><span class="font-semibold text-slate-800">Refunds:</span> <code>refund.created</code>, <code>refund.updated</code>, <code>charge.refunded</code></p>
+                        <p><span class="font-semibold text-slate-800">Refunds:</span> <code>refund.created</code>, <code>refund.updated</code>, <code>charge.refund.updated</code>, <code>charge.refunded</code></p>
                     </div>
                     <input class="admin-input mt-3 font-mono text-xs" type="text" value="{{ $stripeWebhookUrl }}" readonly aria-label="Stripe webhook destination">
                 </div>

@@ -81,6 +81,17 @@ final class AdminBookingController extends Controller
         return redirect()->route('admin.bookings.index')->with('status', 'Booking cancelled.');
     }
 
+    public function cancelWithoutRefund(Booking $booking, Request $request, BookingAdminService $service): RedirectResponse
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:500'],
+        ]);
+
+        $service->cancel($booking->id, 0, $data['reason'], $request->user());
+
+        return redirect()->route('admin.bookings.show', $booking)->with('status', 'Booking cancelled without a refund.');
+    }
+
     private function toRappen(string $amount): int
     {
         [$francs, $rappen] = array_pad(explode('.', $amount, 2), 2, '');

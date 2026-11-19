@@ -28,9 +28,16 @@ final class AdminPaymentController extends Controller
         $data = $request->validate([
             'gross_amount' => ['required', 'integer', 'min:1'],
             'reason' => ['required', 'string', 'max:500'],
+            'cancel_booking_on_success' => ['nullable', 'boolean'],
         ]);
-        $payments->refund($payment->booking, (int) $data['gross_amount'], $data['reason'], $request->user());
+        $payments->refund(
+            $payment->booking,
+            (int) $data['gross_amount'],
+            $data['reason'],
+            $request->user(),
+            (bool) ($data['cancel_booking_on_success'] ?? false),
+        );
 
-        return back()->with('status', 'Refund recorded successfully.');
+        return back()->with('status', 'Refund requested. Any selected booking cancellation happens only after Stripe confirms the refund by webhook.');
     }
 }
