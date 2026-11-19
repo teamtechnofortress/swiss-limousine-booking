@@ -19,6 +19,7 @@ use App\Models\Payment;
 use App\Models\PaymentAttempt;
 use App\Models\Refund;
 use App\Models\User;
+use App\Services\Admin\FinancialReportService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -95,6 +96,7 @@ final class PaymentService
         }
 
         $booking->payment()->update($paymentAttributes);
+        $this->forgetFinancialOverviewAfterCommit();
 
         $paymentId = (int) $booking->payment()->value('id');
         if ($paymentId > 0 && $paymentIntent !== null) {
@@ -117,6 +119,7 @@ final class PaymentService
     {
         $previousStatus = $booking->payment?->status?->value;
         $booking->payment()->update(['status' => PaymentStatus::Failed->value]);
+        $this->forgetFinancialOverviewAfterCommit();
         $this->events->payment('Payment marked as failed.', [
             'booking_id' => $booking->id,
             'booking_reference' => $booking->reference,
@@ -545,5 +548,10 @@ final class PaymentService
 
             SyncStripePaymentLedger::dispatch($payment->id);
         }
+    }
+
+    private function forgetFinancialOverviewAfterCommit(): void
+    {
+        DB::afterCommit(fn () => app(FinancialReportService::class)->forget());
     }
 }

@@ -2,7 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\Booking;
+use App\Models\Payment;
+use App\Models\Refund;
 use App\Models\User;
+use App\Observers\FinancialReportCacheInvalidator;
 use App\Services\Rbac\RbacCatalog;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -29,6 +33,12 @@ final class AppServiceProvider extends ServiceProvider
 
         $this->registerRateLimiters();
         $this->registerPermissionGates();
+
+        // The financial dashboard is a cached projection of these records, never its source of truth.
+        $financialCacheInvalidator = FinancialReportCacheInvalidator::class;
+        Payment::observe($financialCacheInvalidator);
+        Refund::observe($financialCacheInvalidator);
+        Booking::observe($financialCacheInvalidator);
     }
 
     private function registerRateLimiters(): void

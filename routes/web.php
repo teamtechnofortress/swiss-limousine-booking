@@ -25,6 +25,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
     Route::middleware(['auth', 'admin.active'])->group(function (): void {
         Route::get('/', fn () => redirect()->route('admin.dashboard'));
         Route::get('dashboard', [AdminDashboardController::class, 'index'])->name('dashboard')->middleware('can:dashboard.view');
+        Route::post('dashboard/financial-overview/refresh', [AdminDashboardController::class, 'refreshFinancialOverview'])->name('dashboard.financial.refresh')->middleware('can:dashboard.view');
         Route::post('logout', [AdminAuthController::class, 'destroy'])->name('logout');
 
         Route::get('bookings', [AdminBookingController::class, 'index'])->name('bookings.index')->middleware('can:bookings.view');
