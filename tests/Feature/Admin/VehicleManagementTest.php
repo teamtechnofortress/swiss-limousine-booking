@@ -131,8 +131,11 @@ final class VehicleManagementTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.capacity.passengers', 3)
             ->assertJsonPath('data.pricing.mode', 'distance')
-            ->assertJsonPath('data.pricing.price_per_km_minor', 475)
+            ->assertJsonPath('data.display_fare_minor', 12000)
+            ->assertJsonPath('data.display_fare_type', 'minimum')
             ->assertJsonPath('data.pricing.minimum_fare_minor', 12000)
+            ->assertJsonMissingPath('data.price_per_km')
+            ->assertJsonMissingPath('data.pricing.price_per_km_minor')
             ->assertJsonPath('data.availability.online_booking_enabled', true)
             ->assertJsonPath('data.media.cover', null)
             ->assertJsonCount(0, 'data.media.gallery');
