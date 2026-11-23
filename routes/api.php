@@ -71,6 +71,12 @@ Route::prefix('public')->group(function (): void {
         ->middleware('throttle:bookings');
 });
 
+// Compatibility aliases for the existing fleet frontend. The canonical public
+// routes remain under /api/public, alongside trips and configuration.
+Route::get('vehicles', [PublicVehicleController::class, 'index']);
+Route::get('vehicles/{slug}', [PublicVehicleController::class, 'show'])
+    ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*');
+
 /* ----------------------------------------------------------------------
  | Webhooks (signature-verified, no session auth)
  * -------------------------------------------------------------------- */
