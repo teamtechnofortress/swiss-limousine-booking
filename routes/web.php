@@ -92,6 +92,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
             Route::post('vehicles', [AdminVehicleController::class, 'store'])->name('vehicles.store');
             Route::put('vehicles/reorder', [AdminVehicleController::class, 'reorder'])->name('vehicles.reorder');
             Route::put('vehicles/{vehicle}/publication', [AdminVehicleController::class, 'publication'])->name('vehicles.publication');
+            Route::post('vehicles/{vehicle}/pricing-test', [AdminVehicleController::class, 'testPricing'])->name('vehicles.pricing-test');
             Route::get('vehicles/{vehicle}/edit', [AdminVehicleController::class, 'edit'])->name('vehicles.edit');
             Route::patch('vehicles/{vehicle}', [AdminVehicleController::class, 'update'])->name('vehicles.update');
             Route::delete('vehicles/{vehicle}', [AdminVehicleController::class, 'destroy'])->name('vehicles.destroy');

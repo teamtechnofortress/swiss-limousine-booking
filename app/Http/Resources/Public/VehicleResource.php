@@ -30,7 +30,8 @@ final class VehicleResource extends JsonResource
                 'alt' => $this->name,
             ];
         })->values();
-        $bookableOnline = $this->price_per_km !== null && (! $this->slot_check_enabled || (int) ($this->fleet_units_count ?? 0) > 0);
+        $rangePricing = $this->pricing_mode === 'range';
+        $bookableOnline = ($rangePricing || $this->price_per_km !== null) && (! $this->slot_check_enabled || (int) ($this->fleet_units_count ?? 0) > 0);
 
         return [
             'id' => $this->id,
@@ -51,11 +52,20 @@ final class VehicleResource extends JsonResource
             ],
             'price_per_km' => $this->price_per_km,
             'minimum_fare' => $this->minimum_fare,
-            'price_on_request' => $this->price_per_km === null,
+            'price_on_request' => ! $rangePricing && $this->price_per_km === null,
             'pricing' => [
-                'mode' => $this->price_per_km === null ? 'enquiry' : 'distance',
+                'mode' => $rangePricing ? 'distance_range' : ($this->price_per_km === null ? 'enquiry' : 'distance'),
                 'price_per_km_minor' => $this->price_per_km,
                 'minimum_fare_minor' => $this->minimum_fare,
+                'base_distance_m' => $rangePricing ? $this->range_base_distance_m : null,
+                'base_distance_km' => $rangePricing ? $this->range_base_distance_m / 1000 : null,
+                'base_fare_minor' => $rangePricing ? $this->range_base_fare : null,
+                'ranges' => $this->when($rangePricing, fn () => $this->distancePriceRanges->map(fn ($range) => [
+                    'start_distance_m' => $range->start_distance_m,
+                    'end_distance_m' => $range->end_distance_m,
+                    'minimum_amount_minor' => $range->minimum_amount,
+                    'price_per_km_minor' => $range->price_per_km,
+                ])->values()),
             ],
             'availability' => [
                 'online_booking_enabled' => $bookableOnline,

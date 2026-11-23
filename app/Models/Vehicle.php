@@ -11,8 +11,8 @@ use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
-use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Vehicle extends Model implements HasMedia
 {
@@ -33,6 +33,7 @@ class Vehicle extends Model implements HasMedia
     protected $fillable = [
         'name', 'model_name', 'slug', 'category_id', 'description', 'passenger_capacity',
         'luggage_capacity', 'price_per_km', 'minimum_fare', 'amenities',
+        'pricing_mode', 'range_base_distance_m', 'range_base_fare',
         'slot_check_enabled', 'sort_order', 'is_active',
     ];
 
@@ -44,12 +45,20 @@ class Vehicle extends Model implements HasMedia
             'is_active' => 'boolean',
             'price_per_km' => 'integer',
             'minimum_fare' => 'integer',
+            'range_base_distance_m' => 'integer',
+            'range_base_fare' => 'integer',
         ];
     }
 
     public function fleetUnits(): HasMany
     {
         return $this->hasMany(FleetUnit::class);
+    }
+
+    /** Distance tiers apply only to kilometres beyond range_base_distance_m. */
+    public function distancePriceRanges(): HasMany
+    {
+        return $this->hasMany(VehicleDistancePriceRange::class)->orderBy('sort_order');
     }
 
     public function category(): BelongsTo
@@ -73,7 +82,9 @@ class Vehicle extends Model implements HasMedia
         return $query
             ->where('is_active', true)
             ->whereHas('category', fn (Builder $categories) => $categories->active())
-            ->whereNotNull('price_per_km')
+            ->where(fn (Builder $pricing) => $pricing
+                ->where(fn (Builder $simple) => $simple->where('pricing_mode', 'simple')->whereNotNull('price_per_km'))
+                ->orWhere('pricing_mode', 'range'))
             ->where(fn (Builder $q) => $q
                 ->where('slot_check_enabled', false)
                 ->orWhereHas('fleetUnits'));

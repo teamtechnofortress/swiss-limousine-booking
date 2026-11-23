@@ -35,9 +35,10 @@ final class VehicleManager
             ]);
 
             $this->syncUnits($vehicle, $data['units'] ?? []);
+            $this->syncPricing($vehicle, $data);
             $this->audit('vehicle_created', $vehicle, $actor);
 
-            return $vehicle->load(['category.media', 'fleetUnits', 'media']);
+            return $vehicle->load(['category.media', 'fleetUnits', 'media', 'distancePriceRanges']);
         });
     }
 
@@ -75,9 +76,10 @@ final class VehicleManager
                 }
             }
             $vehicle->update($attributes);
+            $this->syncPricing($vehicle, $data);
             $this->audit('vehicle_updated', $vehicle, $actor);
 
-            return $vehicle->load(['category.media', 'fleetUnits', 'media']);
+            return $vehicle->load(['category.media', 'fleetUnits', 'media', 'distancePriceRanges']);
         });
     }
 
@@ -129,6 +131,85 @@ final class VehicleManager
         }
 
         return $attributes;
+    }
+
+    /**
+     * Admins configure total trip-distance boundaries (for example 30–50 km).
+     * Internally tiers are stored as excess distance, preserving precise calculations.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function syncPricing(Vehicle $vehicle, array $data): void
+    {
+        if (! array_key_exists('range_pricing_enabled', $data)) {
+            return;
+        }
+
+        if (! (bool) $data['range_pricing_enabled']) {
+            $vehicle->update(['pricing_mode' => 'simple']);
+
+            return;
+        }
+
+        $baseDistanceM = $this->kilometresToMeters($data['range_base_distance_km'] ?? 0);
+        $ranges = $this->normaliseRanges($data['pricing_ranges'] ?? [], $baseDistanceM);
+        $vehicle->update([
+            'pricing_mode' => 'range',
+            'range_base_distance_m' => $baseDistanceM,
+            'range_base_fare' => (int) ($data['range_base_fare'] ?? 0),
+        ]);
+
+        $vehicle->distancePriceRanges()->delete();
+        $vehicle->distancePriceRanges()->createMany($ranges);
+    }
+
+    /**
+     *  @return list<array{start_distance_m:int,end_distance_m:?int,minimum_amount:int,price_per_km:int,sort_order:int}> */
+    private function normaliseRanges(mixed $input, int $baseDistanceM): array
+    {
+        if (! is_array($input) || $input === []) {
+            throw ValidationException::withMessages(['pricing_ranges' => 'Add at least one distance range when range pricing is enabled.']);
+        }
+
+        $rows = array_values($input);
+        $ranges = [];
+        $startM = 0;
+        foreach ($rows as $index => $inputRange) {
+            if (! is_array($inputRange) || empty($inputRange['price_per_km'])) {
+                throw ValidationException::withMessages(["pricing_ranges.$index.price_per_km" => 'Enter a per-kilometre price for every range.']);
+            }
+
+            $endInput = $inputRange['end_km'] ?? null;
+            $endM = $endInput === null || $endInput === '' ? null : $this->kilometresToMeters($endInput) - $baseDistanceM;
+            if ($endM !== null && $endM <= $startM) {
+                throw ValidationException::withMessages(["pricing_ranges.$index.end_km" => 'The end distance must be greater than this range’s automatic start distance.']);
+            }
+            if ($endM === null && $index !== array_key_last($rows)) {
+                throw ValidationException::withMessages(["pricing_ranges.$index.end_km" => 'Only the final range may have no end distance.']);
+            }
+            if ($endM !== null && $index === array_key_last($rows)) {
+                throw ValidationException::withMessages(["pricing_ranges.$index.end_km" => 'The final range must have no end distance so it covers every longer trip.']);
+            }
+
+            $minimum = $index === 0
+                ? (int) ($inputRange['minimum_amount'] ?? 0)
+                : (int) ceil($startM * (int) $ranges[$index - 1]['price_per_km'] / 1000);
+            $ranges[] = [
+                'start_distance_m' => $startM,
+                'end_distance_m' => $endM,
+                'minimum_amount' => $minimum,
+                'price_per_km' => (int) $inputRange['price_per_km'],
+                'sort_order' => $index,
+            ];
+            $startM = $endM ?? $startM;
+        }
+
+        return $ranges;
+    }
+
+    private function kilometresToMeters(mixed $kilometres): int
+    {
+        return (int) round((float) $kilometres * 1000);
     }
 
     /** @param list<string> $plates */

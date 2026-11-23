@@ -29,7 +29,7 @@ final class VehicleController extends Controller
         ]);
 
         $vehicles = Vehicle::query()
-            ->with(['category.media', 'fleetUnits', 'media'])
+            ->with(['category.media', 'fleetUnits', 'media', 'distancePriceRanges'])
             ->when($filters['q'] ?? null, function ($query, string $term): void {
                 $term = '%'.addcslashes($term, '%_\\').'%';
                 $query->where(fn ($search) => $search->where('name', 'like', $term)->orWhere('model_name', 'like', $term)->orWhere('slug', 'like', $term));
@@ -52,7 +52,7 @@ final class VehicleController extends Controller
 
     public function show(Vehicle $vehicle): VehicleResource
     {
-        return new VehicleResource($vehicle->load(['category.media', 'fleetUnits', 'media']));
+        return new VehicleResource($vehicle->load(['category.media', 'fleetUnits', 'media', 'distancePriceRanges']));
     }
 
     public function update(Vehicle $vehicle, UpdateVehicleRequest $request): VehicleResource
@@ -87,7 +87,7 @@ final class VehicleController extends Controller
 
         activity('fleet')->causedBy($request->user())->performedOn($vehicle)->log('vehicle_images_added');
 
-        return new VehicleResource($vehicle->fresh()->load(['category.media', 'fleetUnits', 'media']));
+        return new VehicleResource($vehicle->fresh()->load(['category.media', 'fleetUnits', 'media', 'distancePriceRanges']));
     }
 
     public function orderImages(Vehicle $vehicle, Request $request): VehicleResource
@@ -103,7 +103,7 @@ final class VehicleController extends Controller
         Media::setNewOrder($data['media_ids']);
         activity('fleet')->causedBy($request->user())->performedOn($vehicle)->log('vehicle_images_reordered');
 
-        return new VehicleResource($vehicle->fresh()->load(['category.media', 'fleetUnits', 'media']));
+        return new VehicleResource($vehicle->fresh()->load(['category.media', 'fleetUnits', 'media', 'distancePriceRanges']));
     }
 
     public function destroyImage(Vehicle $vehicle, int $mediaId, Request $request): JsonResponse

@@ -69,6 +69,29 @@ final class VehicleManagementTest extends TestCase
             ->assertJsonPath('data.slot_check_enabled', false);
     }
 
+    public function test_vehicle_can_use_base_fare_and_continuous_excess_distance_ranges(): void
+    {
+        $payload = $this->payload([
+            'range_pricing_enabled' => true,
+            'range_base_distance_km' => 30,
+            'range_base_fare' => 8000,
+            'pricing_ranges' => [
+                ['end_km' => 50, 'price_per_km' => 300, 'minimum_amount' => 5000],
+                ['end_km' => null, 'price_per_km' => 400],
+            ],
+        ]);
+
+        $this->postJson('/api/admin/vehicles', $payload)
+            ->assertCreated()
+            ->assertJsonPath('data.pricing_mode', 'range')
+            ->assertJsonPath('data.range_base_distance_m', 30000)
+            ->assertJsonPath('data.range_base_fare', 8000)
+            ->assertJsonPath('data.distance_price_ranges.0.start_distance_m', 0)
+            ->assertJsonPath('data.distance_price_ranges.1.start_distance_m', 20000)
+            ->assertJsonPath('data.distance_price_ranges.1.minimum_amount', 6000)
+            ->assertJsonPath('data.distance_price_ranges.1.end_distance_m', null);
+    }
+
     public function test_slot_checks_require_a_unit_before_publishing(): void
     {
         $this->postJson('/api/admin/vehicles', $this->payload(['units' => []]))->assertCreated();

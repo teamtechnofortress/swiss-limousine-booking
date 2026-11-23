@@ -72,7 +72,7 @@ final class TripQuoteService
 
         $offers = [];
         $candidates = $trip->pricing_mode === 'distance'
-            ? Vehicle::query()->with(['category.media', 'media'])->bookable()->get()->map(fn ($vehicle) => ['vehicle' => $vehicle, 'fixed_price' => null])
+            ? Vehicle::query()->with(['category.media', 'media', 'distancePriceRanges'])->bookable()->get()->map(fn ($vehicle) => ['vehicle' => $vehicle, 'fixed_price' => null])
             : $trip->prices->where('pickup_location_id', $pickupLink?->location_id)->map(fn ($price) => ['vehicle' => $price->vehicle, 'fixed_price' => $price]);
         foreach ($candidates as $candidate) {
             $vehicle = $candidate['vehicle']; $fixedPrice = $candidate['fixed_price'];

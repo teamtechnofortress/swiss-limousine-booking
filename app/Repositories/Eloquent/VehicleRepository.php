@@ -15,7 +15,7 @@ final class VehicleRepository implements VehicleRepositoryInterface
             ->bookable()
             // Quotes display the cover thumbnail for every available vehicle.
             // Load it here so producing a quote does not issue one media query per offer.
-            ->with(['category', 'media'])
+            ->with(['category', 'media', 'distancePriceRanges'])
             ->where('passenger_capacity', '>=', $passengers)
             ->where('luggage_capacity', '>=', $luggage)
             ->when($vehicleSlug !== null, fn ($query) => $query->where('slug', $vehicleSlug))

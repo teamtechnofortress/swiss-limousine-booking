@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Vehicles\StoreVehicleRequest;
 use App\Http\Requests\Admin\Vehicles\UpdateVehicleRequest;
+use App\Data\RouteMetrics;
 use App\Models\Booking;
 use App\Models\Vehicle;
 use App\Models\VehicleCategory;
+use App\Services\Pricing\PricingService;
 use App\Services\Settings\SettingsService;
 use App\Services\Vehicles\VehicleManager;
 use Illuminate\Http\JsonResponse;
@@ -68,7 +70,7 @@ final class AdminVehicleController extends Controller
     {
         return view('admin.vehicles.edit', [
             ...$this->formData($vehicle),
-            'vehicle' => $vehicle->load('media'),
+            'vehicle' => $vehicle->load(['media', 'distancePriceRanges']),
             'hasBookings' => Booking::withTrashed()->where('vehicle_id', $vehicle->id)->exists(),
         ]);
     }
@@ -88,6 +90,32 @@ final class AdminVehicleController extends Controller
         $this->vehicles->update($vehicle, ['is_active' => $isActive], $request->user());
 
         return back()->with('status', $isActive ? 'Vehicle published.' : 'Vehicle unpublished.');
+    }
+
+    public function testPricing(Vehicle $vehicle, Request $request, PricingService $pricing): JsonResponse
+    {
+        $data = $request->validate([
+            'distance_km' => ['required', 'numeric', 'min:0', 'max:1000000'],
+        ]);
+        $vehicle->loadMissing('distancePriceRanges');
+
+        if (($vehicle->pricing_mode === 'simple' && $vehicle->price_per_km === null)
+            || ($vehicle->pricing_mode === 'range' && $vehicle->distancePriceRanges->isEmpty())) {
+            throw ValidationException::withMessages([
+                'pricing' => 'Save a complete vehicle price configuration before testing it.',
+            ]);
+        }
+
+        $distanceM = (int) round((float) $data['distance_km'] * 1000);
+        $amount = $pricing->legAmount($vehicle, new RouteMetrics($distanceM, 0));
+
+        return response()->json([
+            'data' => [
+                'distance_km' => $distanceM / 1000,
+                'amount_minor' => $amount,
+                'formatted_amount' => 'CHF '.number_format($amount / 100, 2),
+            ],
+        ]);
     }
 
     public function reorder(Request $request): RedirectResponse
