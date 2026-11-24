@@ -19,7 +19,7 @@ final class MediaController extends Controller
     {
         $data = $request->validate([
             'purpose' => ['required', 'in:site_logo'],
-            'file' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'file' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,svg', 'max:4096'],
         ]);
 
         $setting = Setting::query()->where('key', 'site_logo_url')->firstOrFail();

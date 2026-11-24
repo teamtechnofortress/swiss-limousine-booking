@@ -22,7 +22,7 @@ class Setting extends Model implements HasMedia
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('site_logo')->singleFile()->acceptsMimeTypes([
-            'image/jpeg', 'image/png', 'image/webp',
+            'image/jpeg', 'image/png', 'image/webp', 'image/svg+xml',
         ]);
     }
 }

@@ -102,7 +102,7 @@
                                 <div class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50" data-site-logo-preview>
                                     @if($current)<img src="{{ $current }}" alt="Current site logo" class="size-full object-contain">@else<span class="text-xs font-semibold text-slate-400">Logo</span>@endif
                                 </div>
-                                <div class="min-w-0 flex-1"><input data-site-logo-file class="block w-full text-sm text-slate-600" type="file" accept="image/jpeg,image/png,image/webp" @disabled(! $canEdit)><p class="mt-1 text-xs text-slate-500">PNG, JPG or WebP · max 4 MB. Uploading replaces the current logo.</p></div>
+                                <div class="min-w-0 flex-1"><input data-site-logo-file class="block w-full text-sm text-slate-600" type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml,.svg" @disabled(! $canEdit)><p class="mt-1 text-xs text-slate-500">PNG, JPG, WebP or SVG · max 4 MB. Uploading replaces the current logo.</p></div>
                                 @if($canEdit)<button data-site-logo-upload-button type="button" class="admin-button-soft">Upload logo</button>@endif
                             </div>
                             <p data-site-logo-upload-error class="mt-2 hidden text-xs font-medium text-rose-600"></p>
