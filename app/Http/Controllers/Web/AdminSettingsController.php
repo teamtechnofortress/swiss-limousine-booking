@@ -34,10 +34,10 @@ final class AdminSettingsController extends Controller
         'integrations' => 'Integrations',
         'payment_methods' => 'Payment methods',
         'service_area' => 'Service area',
-        // 'locations' => 'Locations & routes',
+        'locations' => 'Locations & routes',
         'availability' => 'Availability',
         'tax' => 'Tax & currency',
-        // 'pricing' => 'Pricing & quotes',
+        'pricing' => 'Pricing & quotes',
         'bookings' => 'Booking rules',
         'security' => 'Security',
     ];
