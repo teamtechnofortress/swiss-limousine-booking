@@ -12,6 +12,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Collections\MediaCollection;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Vehicle extends Model implements HasMedia
@@ -59,6 +60,50 @@ class Vehicle extends Model implements HasMedia
     public function distancePriceRanges(): HasMany
     {
         return $this->hasMany(VehicleDistancePriceRange::class)->orderBy('sort_order');
+    }
+
+    /** Return all vehicle images in the display order configured by the admin. */
+    public function imageMedia(): MediaCollection
+    {
+        return $this->getMedia('images')->sortBy('order_column')->values();
+    }
+
+    /** Return vehicle gallery images, excluding the primary cover image. */
+    public function galleryMedia(): MediaCollection
+    {
+        return $this->imageMedia()->slice(1)->values();
+    }
+
+    /** Return the first vehicle image, ordered as it is displayed publicly. */
+    public function primaryImage(): ?Media
+    {
+        return $this->imageMedia()->first();
+    }
+
+    /** Return the first vehicle image's web URL, or null when no image exists. */
+    public function primaryImageUrl(): ?string
+    {
+        $cover = $this->primaryImage();
+
+        if ($cover === null) {
+            return null;
+        }
+
+        return $cover->hasGeneratedConversion('web') ? $cover->getUrl('web') : $cover->getUrl();
+    }
+
+    /** Return the first vehicle image's thumbnail, or null when no image exists. */
+    public function thumbnailUrl(): ?string
+    {
+        $cover = $this->primaryImage();
+
+        if ($cover === null) {
+            return null;
+        }
+
+        return $cover->hasGeneratedConversion('thumbnail')
+            ? $cover->getUrl('thumbnail')
+            : $this->primaryImageUrl();
     }
 
     public function category(): BelongsTo

@@ -99,7 +99,7 @@ final class QuoteService
                 'name' => $vehicle->name,
                 'slug' => $vehicle->slug,
                 'category' => $vehicle->category->name,
-                'thumbnail_url' => $this->thumbnailUrl($vehicle),
+                'thumbnail_url' => $vehicle->thumbnailUrl(),
                 'passenger_capacity' => $vehicle->passenger_capacity,
                 'luggage_capacity' => $vehicle->luggage_capacity,
                 'capacity' => [
@@ -197,19 +197,4 @@ final class QuoteService
         return $methods;
     }
 
-    private function thumbnailUrl(Vehicle $vehicle): ?string
-    {
-        $cover = $vehicle->media
-            ->where('collection_name', 'images')
-            ->sortBy('order_column')
-            ->first();
-
-        if ($cover === null) {
-            return null;
-        }
-
-        return $cover->hasGeneratedConversion('thumbnail')
-            ? $cover->getUrl('thumbnail')
-            : ($cover->hasGeneratedConversion('web') ? $cover->getUrl('web') : $cover->getUrl());
-    }
 }

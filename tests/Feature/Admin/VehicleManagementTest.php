@@ -92,6 +92,40 @@ final class VehicleManagementTest extends TestCase
             ->assertJsonPath('data.distance_price_ranges.1.end_distance_m', null);
     }
 
+    public function test_price_tester_returns_the_saved_vehicle_price_for_the_selected_distance(): void
+    {
+        $this->postJson('/api/admin/vehicles', $this->payload())
+            ->assertCreated();
+        $simpleVehicle = Vehicle::query()->firstOrFail();
+
+        $this->postJson('/api/admin/vehicles', $this->payload([
+            'name' => 'Mercedes S-Class',
+            'units' => ['ZH 654 321'],
+            'range_pricing_enabled' => true,
+            'range_base_distance_km' => 30,
+            'range_base_fare' => 8000,
+            'pricing_ranges' => [
+                ['end_km' => 50, 'price_per_km' => 300, 'minimum_amount' => 5000],
+                ['end_km' => null, 'price_per_km' => 400],
+            ],
+        ]))->assertCreated();
+        $rangeVehicle = Vehicle::query()->where('name', 'Mercedes S-Class')->firstOrFail();
+        $this->actingAs($this->manager());
+
+        // 60 km × CHF 3.50/km is CHF 210.00, above the CHF 80.00 minimum.
+        $this->postJson("/admin/vehicles/{$simpleVehicle->id}/pricing-test", ['distance_km' => 60])
+            ->assertOk()
+            ->assertJsonPath('data.distance_km', 60)
+            ->assertJsonPath('data.amount_minor', 21000)
+            ->assertJsonPath('data.formatted_amount', 'CHF 210.00');
+
+        // 70 km has 40 km beyond the base and uses the CHF 4.00/km range.
+        $this->postJson("/admin/vehicles/{$rangeVehicle->id}/pricing-test", ['distance_km' => 70])
+            ->assertOk()
+            ->assertJsonPath('data.amount_minor', 24000)
+            ->assertJsonPath('data.formatted_amount', 'CHF 240.00');
+    }
+
     public function test_slot_checks_require_a_unit_before_publishing(): void
     {
         $this->postJson('/api/admin/vehicles', $this->payload(['units' => []]))->assertCreated();

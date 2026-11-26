@@ -17,7 +17,7 @@ final class VehicleCategoryResource extends JsonResource
             'description' => $this->description,
             'sort_order' => $this->sort_order,
             'is_active' => $this->is_active,
-            'logo_url' => $this->getFirstMediaUrl('logo', 'icon') ?: null,
+            'logo_url' => $this->resource->logoUrl(),
             'vehicles_count' => $this->whenCounted('vehicles'),
         ];
     }

@@ -146,7 +146,7 @@ final class AdminVehicleController extends Controller
         }
 
         if ($data['make_primary'] ?? false) {
-            $images = $vehicle->getMedia('images');
+            $images = $vehicle->imageMedia();
             $newImage = last($uploaded);
             if ($newImage !== null) {
                 $orderedIds = [$newImage->id, ...$images->pluck('id')->reject(fn ($id) => (int) $id === $newImage->id)->all()];
@@ -161,7 +161,7 @@ final class AdminVehicleController extends Controller
 
     public function destroyImage(Vehicle $vehicle, int $mediaId, Request $request): RedirectResponse|JsonResponse
     {
-        $media = $vehicle->getMedia('images')->firstWhere('id', $mediaId);
+        $media = $vehicle->imageMedia()->firstWhere('id', $mediaId);
         abort_if($media === null, 404);
         $media->delete();
         activity('fleet')->causedBy($request->user())->performedOn($vehicle)->log('vehicle_image_deleted');
@@ -171,7 +171,7 @@ final class AdminVehicleController extends Controller
 
     public function makePrimaryImage(Vehicle $vehicle, int $mediaId, Request $request): RedirectResponse|JsonResponse
     {
-        $images = $vehicle->getMedia('images');
+        $images = $vehicle->imageMedia();
         abort_unless($images->contains('id', $mediaId), 404);
 
         $orderedIds = [$mediaId, ...$images->pluck('id')->map(fn ($id) => (int) $id)->reject(fn (int $id) => $id === $mediaId)->all()];
@@ -185,7 +185,7 @@ final class AdminVehicleController extends Controller
     {
         $data = $request->validate(['media_ids' => ['required', 'array'], 'media_ids.*' => ['required', 'integer', 'distinct']]);
         $ids = array_map('intval', $data['media_ids']);
-        $ownedIds = $vehicle->getMedia('images')->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+        $ownedIds = $vehicle->imageMedia()->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
 
         if (count($ids) !== count($ownedIds) || collect($ids)->sort()->values()->all() !== $ownedIds) {
             throw ValidationException::withMessages(['media_ids' => 'The image order must contain every image of this vehicle exactly once.']);
@@ -204,7 +204,7 @@ final class AdminVehicleController extends Controller
         }
 
         return response()->json(['message' => $message, 'data' => [
-            'images' => $vehicle->fresh('media')->getMedia('images')->sortBy('order_column')->values()->map(fn (Media $media) => $this->mediaItem($media))->all(),
+            'images' => $vehicle->fresh('media')->imageMedia()->map(fn (Media $media) => $this->mediaItem($media))->all(),
         ]]);
     }
 

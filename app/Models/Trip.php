@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Collections\MediaCollection;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Trip extends Model implements HasMedia
@@ -36,6 +37,32 @@ class Trip extends Model implements HasMedia
     public function tripLocations(): HasMany { return $this->hasMany(TripLocation::class)->orderBy('sort_order'); }
 
     public function scopePublished(Builder $query): Builder { return $query->where('status', 'published'); }
+
+    /** Return the original cover URL, or null when no cover has been uploaded. */
+    public function coverUrl(): ?string
+    {
+        return $this->getFirstMediaUrl('cover') ?: null;
+    }
+
+    /** Return gallery media in the display order configured by the admin. */
+    public function galleryMedia(): MediaCollection
+    {
+        return $this->getMedia('gallery')->sortBy('order_column')->values();
+    }
+
+    /** Return the cover thumbnail, or null when no cover has been uploaded. */
+    public function thumbnailUrl(): ?string
+    {
+        $cover = $this->getFirstMedia('cover');
+
+        if ($cover === null) {
+            return null;
+        }
+
+        return $cover->hasGeneratedConversion('thumbnail')
+            ? $cover->getUrl('thumbnail')
+            : $cover->getUrl();
+    }
 
     /**
      * The booking keeps this small, customer-facing snapshot so later edits to a

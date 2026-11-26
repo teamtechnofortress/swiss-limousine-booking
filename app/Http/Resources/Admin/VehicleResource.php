@@ -19,7 +19,7 @@ final class VehicleResource extends JsonResource
                 'id' => $this->category->id,
                 'name' => $this->category->name,
                 'slug' => $this->category->slug,
-                'logo_url' => $this->category->getFirstMediaUrl('logo', 'icon') ?: null,
+                'logo_url' => $this->category->logoUrl(),
             ]),
             'description' => $this->description,
             'passenger_capacity' => $this->passenger_capacity,
@@ -47,10 +47,7 @@ final class VehicleResource extends JsonResource
                 'plate' => $unit->plate,
                 'has_booking_history' => $unit->bookings()->withTrashed()->exists(),
             ])->values()),
-            'images' => $this->whenLoaded('media', fn () => $this->media
-                ->where('collection_name', 'images')
-                ->sortBy('order_column')
-                ->values()
+            'images' => $this->whenLoaded('media', fn () => $this->resource->imageMedia()
                 ->map(function ($media): array {
                     // Images uploaded before conversions were introduced do not
                     // have web/thumbnail files yet. Keep them usable meanwhile.

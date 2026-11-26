@@ -94,7 +94,7 @@ final class VehicleController extends Controller
     {
         $data = $request->validate(['media_ids' => ['required', 'array'], 'media_ids.*' => ['required', 'integer', 'distinct']]);
         $ids = array_map('intval', $data['media_ids']);
-        $ownedIds = $vehicle->getMedia('images')->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $ownedIds = $vehicle->imageMedia()->pluck('id')->map(fn ($id) => (int) $id)->all();
         sort($ids);
         sort($ownedIds);
         if ($ids !== $ownedIds) {
@@ -108,7 +108,7 @@ final class VehicleController extends Controller
 
     public function destroyImage(Vehicle $vehicle, int $mediaId, Request $request): JsonResponse
     {
-        $media = $vehicle->getMedia('images')->firstWhere('id', $mediaId);
+        $media = $vehicle->imageMedia()->firstWhere('id', $mediaId);
         abort_if($media === null, 404);
         $media->delete();
         activity('fleet')->causedBy($request->user())->performedOn($vehicle)->log('vehicle_image_deleted');

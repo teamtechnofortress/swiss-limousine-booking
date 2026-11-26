@@ -17,6 +17,7 @@ use App\Http\Controllers\Public\PublicConfigController;
 use App\Http\Controllers\Public\QuoteController;
 use App\Http\Controllers\Public\TripController;
 use App\Http\Controllers\Public\VehicleController as PublicVehicleController;
+use App\Http\Controllers\Public\VehiclePriceEstimateController;
 use App\Http\Controllers\Webhooks\StripeWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -37,6 +38,8 @@ Route::prefix('public')->group(function (): void {
     Route::post('trips/{slug}/enquiries', [EnquiryController::class, 'storeTrip'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')->middleware('throttle:bookings');
 
     Route::get('vehicles', [PublicVehicleController::class, 'index']);
+    Route::get('vehicle-price-estimates', VehiclePriceEstimateController::class)
+        ->middleware('throttle:quote-read');
     Route::get('vehicles/{slug}', [PublicVehicleController::class, 'show'])
         ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*');
 

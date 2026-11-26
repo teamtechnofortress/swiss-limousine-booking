@@ -31,6 +31,12 @@ class VehicleCategory extends Model implements HasMedia
         return $query->where('is_active', true);
     }
 
+    /** Return the category logo icon URL, or null when no logo has been uploaded. */
+    public function logoUrl(): ?string
+    {
+        return $this->getFirstMediaUrl('logo', 'icon') ?: null;
+    }
+
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('logo')->singleFile()->acceptsMimeTypes([

@@ -69,8 +69,8 @@ final class TripController extends Controller
             'hero_image_url' => $content['hero_image_url'] ?? null,
             'faqs' => $trip->faqs,
             'region' => $trip->region,
-            'cover_url' => $trip->getFirstMediaUrl('cover') ?: null,
-            'gallery' => $trip->getMedia('gallery')->map(fn ($media) => ['id' => $media->id, 'url' => $media->getUrl()])->values(),
+            'cover_url' => $trip->coverUrl(),
+            'gallery' => $trip->galleryMedia()->map(fn ($media) => ['id' => $media->id, 'url' => $media->getUrl()])->all(),
             // An enquiry is always available. This only controls whether the customer may
             // start the online quote-and-book flow; the quote endpoint makes the live checks.
             'pricing_mode' => $trip->pricing_mode,
@@ -153,8 +153,7 @@ final class TripController extends Controller
     /** @return array<string,mixed> */
     private function card(Trip $trip): array
     {
-        $cover = $trip->getFirstMedia('cover');
-        $originalCoverUrl = $cover?->getUrl();
+        $originalCoverUrl = $trip->coverUrl();
 
         return [
             'slug' => $trip->slug,
@@ -168,7 +167,7 @@ final class TripController extends Controller
             'starting_from_price_minor' => $trip->pricing_mode === 'fixed' ? $trip->prices->min('price_minor') : null,
             // Kept for existing clients; this is the original, full-resolution upload.
             'cover_url' => $originalCoverUrl,
-            'thumbnail_url' => $cover?->hasGeneratedConversion('thumbnail') ? $cover->getUrl('thumbnail') : $originalCoverUrl,
+            'thumbnail_url' => $trip->thumbnailUrl(),
             'original_cover_url' => $originalCoverUrl,
         ];
     }

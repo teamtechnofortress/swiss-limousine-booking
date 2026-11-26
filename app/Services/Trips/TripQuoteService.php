@@ -119,9 +119,9 @@ final class TripQuoteService
     /** @return array<string, mixed> */
     private function vehicleCard(Vehicle $vehicle): array
     {
-        $primaryImage = $vehicle->media->where('collection_name', 'images')->sortBy('order_column')->first();
-        $imageUrl = $primaryImage?->hasGeneratedConversion('web') ? $primaryImage->getUrl('web') : $primaryImage?->getUrl();
-        $thumbnailUrl = $primaryImage?->hasGeneratedConversion('thumbnail') ? $primaryImage->getUrl('thumbnail') : $imageUrl;
+        $primaryImage = $vehicle->primaryImage();
+        $imageUrl = $vehicle->primaryImageUrl();
+        $thumbnailUrl = $vehicle->thumbnailUrl();
         $category = $vehicle->category;
 
         return [
@@ -133,7 +133,7 @@ final class TripQuoteService
                 'id' => $category->id,
                 'name' => $category->name,
                 'slug' => $category->slug,
-                'logo_url' => $category->getFirstMediaUrl('logo', 'icon') ?: null,
+                'logo_url' => $category->logoUrl(),
             ],
             'description' => $vehicle->description,
             'image' => $primaryImage === null ? null : [

@@ -10,17 +10,16 @@ final class VehicleResource extends JsonResource
     /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
-        $images = $this->media->where('collection_name', 'images')->sortBy('order_column')->values();
-        $primary = $images->first();
-        $imageUrl = $primary?->hasGeneratedConversion('web') ? $primary->getUrl('web') : $primary?->getUrl();
-        $thumbnailUrl = $primary?->hasGeneratedConversion('thumbnail') ? $primary->getUrl('thumbnail') : $imageUrl;
+        $primary = $this->resource->primaryImage();
+        $imageUrl = $this->resource->primaryImageUrl();
+        $thumbnailUrl = $this->resource->thumbnailUrl();
         $cover = $primary === null ? null : [
             'id' => $primary->id,
             'url' => $imageUrl,
             'thumbnail_url' => $thumbnailUrl,
             'alt' => $this->name,
         ];
-        $gallery = $images->slice(1)->map(function ($media): array {
+        $gallery = $this->resource->galleryMedia()->map(function ($media): array {
             $url = $media->hasGeneratedConversion('web') ? $media->getUrl('web') : $media->getUrl();
 
             return [
@@ -42,7 +41,7 @@ final class VehicleResource extends JsonResource
                 'id' => $this->category->id,
                 'name' => $this->category->name,
                 'slug' => $this->category->slug,
-                'logo_url' => $this->category->getFirstMediaUrl('logo', 'icon') ?: null,
+                'logo_url' => $this->category->logoUrl(),
             ],
             'description' => $this->description,
             'passenger_capacity' => $this->passenger_capacity,
